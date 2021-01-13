@@ -1,0 +1,23 @@
+---
+title: "titanic_report"
+author: "Alp Gunsever"
+date: "13/01/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## 1 - Introduction 
+
+This is a data analysis report intended to test bayesian data analysis skills using the titanic dataset from kaggle.
+
+```{r libraries}
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(shinystan)
+```
+
+## 2- Exploratory Data Analysis
