@@ -1,3 +1,6 @@
+library(mltools)
+library(data.table)
+
 # function to change data format
 cleanTitanicData <- function(dat, dataType){
   
@@ -72,5 +75,17 @@ cleanTitanicData <- function(dat, dataType){
     dat$title[grepl("Mr|Mrs|Miss|Master",dat$title) == FALSE] <- "Other"
     dat$title <- as.factor(dat$title)  
   }
+  
+  #Extract categorical variables
+  cat_var_names <- colnames(dat)[sapply(dat[,colnames(dat)],class) %in% c("factor","character")]
+  dat_cat <- dat[,cat_var_names]
+  
+  if (dataType == 'train') {
+  # one hot encoding except for survived and isMale columns
+  dat <- one_hot(as.data.table(dat), cols = cat_var_names[cat_var_names != c("Survived","isMale")])
+  } else{
+    dat <- one_hot(as.data.table(dat), cols = cat_var_names[cat_var_names != c("isMale")])  
+  }
+  
   return(dat)
 }

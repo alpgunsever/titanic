@@ -36,6 +36,17 @@ dat.test <- read.csv(file.path(dir,"test.csv"))
 # clean train and test data
 train <- cleanTitanicData(dat.train,'train')
 test <- cleanTitanicData(dat.test,'test')
+
+y.train <- as.numeric(train$Survived) # outcome
+y.train <- y.train-1
+pId.train <- train$PassengerId # ID for predictions
+pId.test <- test$PassengerId # ID for predictions
+
+N.train <- nrow(train)
+K.train <- ncol(train)
+N.test <- nrow(test)
+K.test <- ncol(test)
+
 ```
 
 ## 3- Prior Predictive Checking
