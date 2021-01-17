@@ -20,6 +20,11 @@ options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
 source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions.R"))
+library(corrplot)
+library(rstanarm)
+library(projpred)
+library(bayesplot)
+theme_set(bayesplot::theme_default(base_family = "sans"))
 ```
 
 ## 2- Exploratory Data Analysis
@@ -42,12 +47,85 @@ y.train <- y.train-1
 pId.train <- train$PassengerId # ID for predictions
 pId.test <- test$PassengerId # ID for predictions
 
-N.train <- nrow(train)
-K.train <- ncol(train)
-N.test <- nrow(test)
-K.test <- ncol(test)
+predictor.variables <- colnames(train)[3:length(colnames(train))]
 
+X <- subset(train, select=predictor.variables)
+X.train <- model.matrix(y.train~., X)[,-1] #drop int
+X <- subset(test, select=predictor.variables)
+X.test <- model.matrix(~., X)[,-1] #drop int
+
+colnames(X.train) <- gsub(" ", "", colnames(X.train), fixed = TRUE)
+colnames(X.test) <- gsub(" ", "", colnames(X.test), fixed = TRUE)
+
+N.train <- nrow(X.train)
+D.train <- ncol(X.train)
+N.test <- nrow(X.test)
+D.test <- ncol(X.test)
+
+for(i in 1:D.train){
+  if (colnames(X.train)[i] != 'AgeZ' & colnames(X.train)[i] != 'FareLog') {
+    X.train[,i] <- scale(X.train[,i], scale = F)
+  } else{
+    X.train[,i] <- (X.train[,i]-mean(X.train[,i]))/(2*sd(X.train[,i]))
+  }
+}
+
+for(i in 1:D.test){
+  if (colnames(X.test)[i] != 'AgeZ' & colnames(X.train)[i] != 'FareLog') {
+    X.test[,i] <- scale(X.test[,i], scale = F)
+  } else{
+    X.test[,i] <- (X.test[,i]-mean(X.test[,i]))/(2*sd(X.test[,i]))
+  }
+}
+
+ticketTrain <- as.numeric(train$Ticket)
+ticketTest <- as.numeric(test$Ticket)
+L <- length(levels(train$Ticket))
+
+dummy.train <- cbind(y.train,X.train)
+corrplot(cor(dummy.train))
 ```
 
 ## 3- Prior Predictive Checking
+
+## 4 - Model Fitting and Algorithm Diagnostics
+```{r reference model}
+p0 <- 10 # prior guess for the number of relevant variables
+tau0 <- p0/(D.train-p0) * 1/sqrt(N.train)
+rhs_prior <- hs(global_scale=tau0)
+formula <- as.formula(paste("y.train ~", paste(colnames(X.train), collapse = "+")))
+df.train <- as.data.frame(cbind(y.train, X.train))
+fitrhs <- stan_glm(formula, data = df.train, prior=rhs_prior, QR=TRUE, seed=187, refresh=0, family = binomial())
+summary(fitrhs)
+
+yrep <- posterior_predict(fitrhs, draws = 50)
+ppc_dens_overlay(y.train, yrep)
+
+mcmc_areas(as.matrix(fitrhs)[,2:26])
+
+refmodel <- get_refmodel(fitrhs)
+
+fitrhs_cvvs <- cv_varsel(refmodel, method = 'forward', cv_method = 'LOO', nloo = 100, verbose = TRUE)
+solution_terms(fitrhs_cvvs)
+plot(fitrhs_cvvs, stats = c('elpd', 'rmse'), deltas=F)
+
+suggest_size(fitrhs_cvvs, alpha=0.025)
+
+mcmc_areas(as.matrix(refmodel$fit),
+           pars = c("(Intercept)", paste0(solution_terms(fitrhs_cvvs)[1:7]))) +
+  coord_cartesian(xlim = c(-10, 4))
+
+ 
+# Visualise the projected three most relevant variables
+proj <- project(fitrhs_cvvs, nterms = 7, ns = 500)
+mcmc_areas(as.matrix(proj)) +
+  coord_cartesian(xlim = c(-3, 4))
+```
+
+## 5 - Posterior Predictive Checking
+
+## 6 - Model Comparison
+
+
+
 
