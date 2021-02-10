@@ -19,7 +19,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
-source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
+source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions.R"))
 library(corrplot)
 library(rstanarm)
 library(projpred)
@@ -40,8 +40,8 @@ dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
 # adjustments on data set
-train <- cleanTitanicData_temp(dat.train,'train')
-test <- cleanTitanicData_temp(dat.test,'test')
+train <- cleanTitanicData(dat.train,'train')
+test <- cleanTitanicData(dat.test,'test')
 ```
 
 Then the missing observations will be handled seperately.
@@ -68,11 +68,11 @@ colnames(X.train) <- gsub(" ", "", colnames(X.train), fixed = TRUE)
 colnames(X.test) <- gsub(" ", "", colnames(X.test), fixed = TRUE)
 
 N.train <- nrow(X.train)
-K.train <- ncol(X.train)
+D.train <- ncol(X.train)
 N.test <- nrow(X.test)
-K.test <- ncol(X.test)
+D.test <- ncol(X.test)
 
-for(i in 1:K.train){
+for(i in 1:D.train){
   if (colnames(X.train)[i] != 'AgeZ' & colnames(X.train)[i] != 'FareLog') {
     X.train[,i] <- scale(X.train[,i], scale = F)
   } else{
@@ -80,7 +80,7 @@ for(i in 1:K.train){
   }
 }
 
-for(i in 1:K.test){
+for(i in 1:D.test){
   if (colnames(X.test)[i] != 'AgeZ' & colnames(X.train)[i] != 'FareLog') {
     X.test[,i] <- scale(X.test[,i], scale = F)
   } else{
@@ -90,7 +90,7 @@ for(i in 1:K.test){
 
 ticketTrain <- as.numeric(train$Ticket)
 ticketTest <- as.numeric(test$Ticket)
-J <- length(levels(train$Ticket))
+L <- length(levels(train$Ticket))
 
 dummy.train <- cbind(y.train,X.train)
 corrplot(cor(dummy.train))
@@ -100,38 +100,42 @@ corrplot(cor(dummy.train))
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r reference model}
-# create model
-stanFile <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis",
-                       "BDA3 (Gelman)","titanic","scripts","multivariate_hier_model.stan")
-multi_hier_model <- stan_model(stanFile)
+p0 <- 10 # prior guess for the number of relevant variables
+tau0 <- p0/(D.train-p0) * 1/sqrt(N.train)
+rhs_prior <- hs(global_scale=tau0)
+formula <- as.formula(paste("y.train ~", paste(colnames(X.train), collapse = "+")))
+df.train <- as.data.frame(cbind(y.train, X.train))
+fitrhs <- stan_glm(formula, data = df.train, prior=rhs_prior, QR=TRUE, seed=187, refresh=0, family = binomial())
+summary(fitrhs)
 
-options(mc.cores = 4)
-multi_hier_model.fit <- sampling(multi_hier_model,list(K = K.train, Ntrain=N.train, J=J,Ntest=N.test,
-                                   y=y.train,jjtrain=ticketTrain,jjtest=ticketTest,xtrain=X.train,xtest=X.test),
-                     iter = 2000, chains = 4, warmup = 1000, control = list(adapt_delta = 0.99))
+yrep <- posterior_predict(fitrhs, draws = 50)
+ppc_dens_overlay(y.train, yrep)
 
-# diagnose
-print(multi_hier_model.fit, probs = c(0.25,0.5,0.75))
+mcmc_areas(as.matrix(fitrhs)[,2:26])
+
+refmodel <- get_refmodel(fitrhs)
+
+fitrhs_cvvs <- cv_varsel(refmodel, method = 'forward', cv_method = 'LOO', nloo = 100, verbose = TRUE)
+solution_terms(fitrhs_cvvs)
+plot(fitrhs_cvvs, stats = c('elpd', 'rmse'), deltas=F)
+
+suggest_size(fitrhs_cvvs, alpha=0.025)
+
+mcmc_areas(as.matrix(refmodel$fit),
+           pars = c("(Intercept)", paste0(solution_terms(fitrhs_cvvs)[1:7]))) +
+  coord_cartesian(xlim = c(-10, 4))
+
+ 
+# Visualise the projected three most relevant variables
+proj <- project(fitrhs_cvvs, nterms = 7, ns = 500)
+mcmc_areas(as.matrix(proj)) +
+  coord_cartesian(xlim = c(-3, 4))
 ```
 
 ## 5 - Posterior Predictive Checking
 
 ## 6 - Model Comparison
 
-## 7 - Prediction Submission
-```{r predictions}
-params.hier <- extract(multi_hier_model.fit)
-y_pred.hier <- params.hier$pred_Survival
-y_pred.hier  <- y_pred.hier[2001:4000,]
-y_pred.hier.train <- params.hier$pred_Survival_train
-y_pred.hier.train  <- y_pred.hier.train[2001:4000,]
-probs.hier <- apply(y_pred.hier, 2, mean)
-probs.hier.train <- apply(y_pred.hier.train, 2, mean)
 
-preds.multi_hier <- ifelse(probs.hier > .5, 1, 0)
 
-multi_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds.multi_hier)
-write.csv(x = multi_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","multi_hierarchical.csv"),
-          row.names = FALSE)
-```
 

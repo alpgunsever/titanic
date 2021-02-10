@@ -2,7 +2,7 @@
 #library(data.table)
 
 # function to change data format
-cleanTitanicData <- function(dat, dataType){
+cleanTitanicData_temp <- function(dat, dataType){
   
   # factorize Pclass variable
   dat$Pclass <- as.factor(dat$Pclass)  
@@ -14,11 +14,11 @@ cleanTitanicData <- function(dat, dataType){
   dat <- dat[ , -which(names(dat) %in% c("Name"))]
   
   # NAs on Age replaced with median
-  #dat$Age[is.na(dat$Age)] <- median(dat$Age[complete.cases(dat$Age)])
+  dat$Age[is.na(dat$Age)] <- median(dat$Age[complete.cases(dat$Age)])
   
   # factorize cabin variable according to letter
   dat$Cabin <-sapply(dat$Cabin, function(x) substr(x,1,1))
-  #dat$Cabin[dat$Cabin==""] <- "Other"
+  dat$Cabin[dat$Cabin==""] <- "Other"
   dat$Cabin[grepl("F|G|T",dat$Cabin) == TRUE] <- "F"
   dat$Cabin <- as.factor(dat$Cabin)
   
@@ -39,7 +39,7 @@ cleanTitanicData <- function(dat, dataType){
   #dat$Ticket <- sapply(dat$Ticket, function(x) ifelse(grepl("A|C|F|L|P|S|W",substring(x,1,1))==FALSE,substring(x,1,1),x))
   #dat$Ticket[grepl("1|2|3|A|C|P|S",dat$Ticket) == FALSE] <- "Other"
   dat$Ticket <- sapply(dat$Ticket, function(x) ifelse(nchar(x)>1,as.character(nchar(x)),x))
-  #dat$Ticket[grepl("4|5|6|P|C|S",dat$Ticket) == FALSE] <- "Other"
+  dat$Ticket[grepl("4|5|6|P|C|S",dat$Ticket) == FALSE] <- "Other"
   dat$Ticket <- as.factor(dat$Ticket)
   
   # Create family size variable including the passenger itself
@@ -53,10 +53,10 @@ cleanTitanicData <- function(dat, dataType){
   dat$Fsize <- as.factor(dat$Fsize)
   
   # Scale age variable as normally distributed and log transform fare variable
-  #dat$AgeZ <- scale(dat$Age)
-  #dat$Fare[is.na(dat$Fare)] <- median(dat$Fare[complete.cases(dat$Fare)])
-  #dat$FareLog <- log(dat$Fare+1) # 1 added to avoid log(0)
-  #dat <- dat[ , -which(names(dat) %in% c("Age","Fare"))]
+  dat$AgeZ <- scale(dat$Age)
+  dat$Fare[is.na(dat$Fare)] <- median(dat$Fare[complete.cases(dat$Fare)])
+  dat$FareLog <- log(dat$Fare+1) # 1 added to avoid log(0)
+  dat <- dat[ , -which(names(dat) %in% c("Age","Fare"))]
   
   # Create family size variable including the passenger itself
   dat$isMale <- NA
@@ -69,10 +69,10 @@ cleanTitanicData <- function(dat, dataType){
     # factorize Survived column
     dat$Survived <- as.factor(dat$Survived)
     dat$title[760] <- "Countess"
-    #dat$title[grepl("Mr|Mrs|Miss|Master",dat$title) == FALSE] <- "Other"
+    dat$title[grepl("Mr|Mrs|Miss|Master",dat$title) == FALSE] <- "Other"
     dat$title <- as.factor(dat$title)
   } else{
-    #dat$title[grepl("Mr|Mrs|Miss|Master",dat$title) == FALSE] <- "Other"
+    dat$title[grepl("Mr|Mrs|Miss|Master",dat$title) == FALSE] <- "Other"
     dat$title <- as.factor(dat$title)  
   }
   
