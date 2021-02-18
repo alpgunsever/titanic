@@ -50,58 +50,7 @@ Then the missing observations will be handled seperately.
 
 ```
 
-
-```{r input for model 1}
-y.train <- as.numeric(train$Survived) # outcome
-y.train <- y.train-1
-pId.train <- train$PassengerId # ID for predictions
-pId.test <- test$PassengerId # ID for predictions
-predictor1.variables <- colnames(train)[3:length(colnames(train))]
-#predictor1.variables <- predictor1.variables[predictor1.variables != "Ticket"]
-
-X1 <- subset(train, select=predictor1.variables)
-X1.train <- model.matrix(y.train~., X1)
-X1.train <- X1.train[,-13] # removing titleMr
-X1 <- subset(test, select=predictor1.variables)
-X1.test <- model.matrix(~., X1)
-X1.test <- X1.test[,-13] # removing titleMr
-
-colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
-colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
-
-N1.train <- nrow(X1.train)
-K1.train <- ncol(X1.train)
-N1.test <- nrow(X1.test)
-K1.test <- ncol(X1.test)
-
-for(i in 1:K1.train){
-  if (colnames(X1.train)[i] != 'AgeLog' & colnames(X1.train)[i] != 'FareLog') {
-    X1.train[,i] <- scale(X1.train[,i], scale = F)
-  } else{
-    X1.train[,i] <- (X1.train[,i]-mean(X1.train[,i]))/(2*sd(X1.train[,i]))
-  }
-}
-
-for(i in 1:K1.test){
-  if (colnames(X1.test)[i] != 'AgeLog' & colnames(X1.test)[i] != 'FareLog') {
-    X1.test[,i] <- scale(X1.test[,i], scale = F)
-  } else{
-    X1.test[,i] <- (X1.test[,i]-mean(X1.test[,i]))/(2*sd(X1.test[,i]))
-  }
-}
-
-ticketTrain <- as.numeric(train$Ticket)
-ticketTest <- as.numeric(test$Ticket)
-J <- length(levels(train$Ticket))
-
-X1.train[,1] <- 1
-X1.test[,1] <- 1
-
-dummy1.train <- cbind(y.train,X1.train[,2:K1.train])
-corrplot(cor(dummy1.train))
-```
-
-```{r input for rstanarm model}
+```{r input for rstanarm model1}
 y.train <- as.numeric(train$Survived) # outcome
 y.train <- y.train-1
 pId.train <- train$PassengerId # ID for predictions
@@ -144,7 +93,10 @@ ticketTrain <- as.numeric(train$Ticket)
 ticketTest <- as.numeric(test$Ticket)
 ```
 
-```{r rstanarm trials}
+## 3- Prior Predictive Checking
+
+## 4 - Model Fitting and Algorithm Diagnostics
+```{r model1 fitting}
 ticket <- ticketTrain 
 formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
 
@@ -152,7 +104,7 @@ df.train <- as.data.frame(cbind(y.train, X1.train,ticket))
 ticket <- ticketTest
 df.test <- as.data.frame(cbind(X1.test,ticket))
                        
-fit_hier_ticket <- stan_glmer(formula = formula1,
+model1_fit_hier_ticket <- stan_glmer(formula = formula1,
                               data = df.train, 
                               cores=4,
                               adapt_delta = 0.98,
@@ -161,152 +113,28 @@ fit_hier_ticket <- stan_glmer(formula = formula1,
                               prior = student_t(7,0,2.5),
                               prior_intercept = student_t(7,0,2.5))
 
-summary(fit_hier_ticket)
-prior_summary(object = fit_hier_ticket)
+```
 
-ytest <- posterior_predict(fit_hier_ticket, df.test, draws = 100)
-dim(ytest)
+```{r model1 diagnostics}
+summary(model1_fit_hier_ticket)
+prior_summary(object = model1_fit_hier_ticket)
 
-probs.hier <- apply(ytest, 2, mean)
-preds.hier <- ifelse(probs.hier > .5, 1, 0)
-hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds.hier)
-write.csv(x = hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","nonCenter_hierarchical.csv"),
-          row.names = FALSE)
-
-ppc_dens_overlay(y.train, yrep)
+y_pred1.hier <- posterior_predict(fit_hier_ticket, df.test, draws = 500)
+ppc_dens_overlay(y.train, y_pred1.hier)
 
 mcmc_areas(as.matrix(fit_hier_ticket)[,1:19])
 ```
 
-
-
-```{r input for model 2}
-predictor2.variables <- c("Pclass","Embarked","Fsize","isMale","Cabin")
-
-X2 <- subset(train, select=predictor2.variables)
-X2.train <- model.matrix(y.train~., X2)[,-1] #drop int
-X2 <- subset(test, select=predictor2.variables)
-X2.test <- model.matrix(~., X2)[,-1] #drop int
-
-# remove collinear variables
-X2.train <- X2.train[ , -which(colnames(X2.train) %in% c("Fsizesingleton"))]
-X2.train <- X2.train[ , -which(colnames(X2.train) %in% c("EmbarkedQ"))]
-X2.train <- X2.train[ , -which(colnames(X2.train) %in% c("Pclass2"))]
-rlist.train <- list() 
-
-for(i in 1:length(colnames(X2.train))){
-  if (grepl("Cabin", colnames(X2.train)[i], fixed = F) && !grepl("CabinOther", colnames(X2.train)[i], fixed = F)) {
-    rlist.train <- c(rlist.train,i)
-  }
-}
-
-X2.train <- X2.train[,-as.numeric(rlist.train)]
-X2.test <- X2.test[ , -which(colnames(X2.test) %in% c("Fsizesingleton"))]
-X2.test <- X2.test[ , -which(colnames(X2.test) %in% c("EmbarkedQ"))]
-X2.test <- X2.test[ , -which(colnames(X2.test) %in% c("Pclass2"))]
-rlist.test <- list() 
-
-for(i in 1:length(colnames(X2.test))){
-  if (grepl("Cabin", colnames(X2.test)[i], fixed = F) && !grepl("CabinOther", colnames(X2.test)[i], fixed = F)) {
-    rlist.test <- c(rlist.test,i)
-  }
-}
-
-X2.test <- X2.test[,-as.numeric(rlist.test)]
-
-N2.train <- nrow(X2.train)
-D2.train <- ncol(X2.train)
-N2.test <- nrow(X2.test)
-D2.test <- ncol(X2.test)
-
-for(i in 1:D2.train){
-  if (colnames(X2.train)[i] != 'Age') {
-    X2.train[,i] <- scale(X2.train[,i], scale = F)
-  } else{
-    X2.train[,i] <- (X2.train[,i]-mean(X2.train[,i]))/(2*sd(X2.train[,i]))
-  }
-}
-
-for(i in 1:D2.test){
-  if (colnames(X2.test)[i] != 'Age') {
-    X2.test[,i] <- scale(X2.test[,i], scale = F)
-  } else{
-    X2.test[,i] <- (X2.test[,i]-mean(X2.test[,i]))/(2*sd(X2.test[,i]))
-  }
-}
-
-# groups according to ticket
-L <- length(levels(train$Ticket))
-
-dummy2.train <- cbind(y.train,X2.train)
-corrplot(cor(dummy2.train))
-```
-
-
-## 3- Prior Predictive Checking
-
-## 4 - Model Fitting and Algorithm Diagnostics
-```{r model1 fitting}
-# create model
-model1_stanFile <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis",
-                       "BDA3 (Gelman)","titanic","scripts","model1_multivariate_hier_model.stan")
-model1_multi_hier_model <- stan_model(model1_stanFile)
-
-options(mc.cores = 4)
-model1_multi_hier_model.fit <- sampling(model1_multi_hier_model,list(K = K1.train, Ntrain=N1.train, J=J,Ntest=N1.test,
-                                   y=y.train,jjtrain=ticketTrain,jjtest=ticketTest,xtrain=X1.train,xtest=X1.test),
-                     iter = 2000, chains = 4, warmup = 1000, control = list(adapt_delta = 0.99))
-
-# diagnose
-print(model1_multi_hier_model.fit, probs = c(0.25,0.5,0.75))
-```
-
-
-
-```{r model2 fitting}
-# create model
-model2_stanFile <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis",
-                       "BDA3 (Gelman)","titanic","scripts","model2_nonCenter_hier_model.stan")
-model2_nonCenter_hier_model <- stan_model(model2_stanFile)
-
-options(mc.cores = 4)
-model2_nonCenter_hier_model.fit <- sampling(model2_nonCenter_hier_model,list(K=K2.train,Ntrain=N2.train,J=J,Ntest=N2.test,
-                                   y=y.train,jjtrain=ticketTrain,jjtest=ticketTest,xtrain=X2.train,xtest=X2.test),
-                     iter = 2000, chains = 4, warmup = 1000, control = list(adapt_delta = 0.99))
-
-# diagnose
-print(model2_nonCenter_hier_model.fit, probs = c(0.25,0.5,0.75))
-```
 ## 5 - Posterior Predictive Checking
 
 ## 6 - Model Comparison
 
 ## 7 - Prediction Submission
 ```{r predictions model1}
-params1.hier <- extract(model1_multi_hier_model.fit)
-y_pred1.hier <- params1.hier$pred_Survival
-y_pred1.hier.train <- params1.hier$pred_Survival_train
 probs1.hier <- apply(y_pred1.hier, 2, mean)
-probs1.hier.train <- apply(y_pred1.hier.train, 2, mean)
+preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
-preds1.multi_hier <- ifelse(probs1.hier > .5, 1, 0)
-
-multi_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.multi_hier)
-write.csv(x = multi_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","multi_hierarchical.csv"),
-          row.names = FALSE)
-```
-
-
-```{r predictions model2}
-params2.hier <- extract(model2_nonCenter_hier_model.fit)
-y_pred2.hier <- params2.hier$pred_Survival
-y_pred2.hier.train <- params2.hier$pred_Survival_train
-probs2.hier <- apply(y_pred2.hier, 2, mean)
-probs2.hier.train <- apply(y_pred2.hier.train, 2, mean)
-
-preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
-
-hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.multi_hier)
-write.csv(x = hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","nonCenter_hierarchical.csv"),
+model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
           row.names = FALSE)
 ```
