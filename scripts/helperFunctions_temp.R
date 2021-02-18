@@ -52,8 +52,8 @@ cleanTitanicData_temp <- function(dat, dataType){
   dat <- dat[ , -which(names(dat) %in% c("familySize"))]
   dat$Fsize <- as.factor(dat$Fsize)
   
-  # Scale age variable as normally distributed and log transform fare variable
-  dat$AgeZ <- scale(dat$Age)
+  # Loog transform age and fare variable
+  dat$AgeLog <- log(dat$Age)
   dat$Fare[is.na(dat$Fare)] <- median(dat$Fare[complete.cases(dat$Fare)])
   dat$FareLog <- log(dat$Fare+1) # 1 added to avoid log(0)
   dat <- dat[ , -which(names(dat) %in% c("Age","Fare"))]
