@@ -97,14 +97,27 @@ ticketTest <- as.numeric(test$Ticket)
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model1 fitting}
+# model 1 ------------------------------------------------------------------------------------
 ticket <- ticketTrain 
-formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
-
 df.train <- as.data.frame(cbind(y.train, X1.train,ticket))
 ticket <- ticketTest
 df.test <- as.data.frame(cbind(X1.test,ticket))
-                       
+
+formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
+
 model1_fit_hier_ticket <- stan_glmer(formula = formula1,
+                              data = df.train, 
+                              cores=4,
+                              adapt_delta = 0.98,
+                              algorithm = "sampling",
+                              family = binomial(link = "logit"),
+                              prior = student_t(7,0,2.5),
+                              prior_intercept = student_t(7,0,2.5))
+
+# model 2 ------------------------------------------------------------------------------------
+formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1|ticket)","+(0+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
+
+model2_fit_hier_ticket <- stan_glmer(formula = formula2,
                               data = df.train, 
                               cores=4,
                               adapt_delta = 0.98,
@@ -115,14 +128,21 @@ model1_fit_hier_ticket <- stan_glmer(formula = formula1,
 
 ```
 
-```{r model1 diagnostics}
+```{r model diagnostics}
 summary(model1_fit_hier_ticket)
 prior_summary(object = model1_fit_hier_ticket)
+prior_summary(object = model2_fit_hier_ticket)
 
-y_pred1.hier <- posterior_predict(fit_hier_ticket, df.test, draws = 500)
+y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df.test, draws = 500)
+y_pred2.hier <- posterior_predict(model2_fit_hier_ticket, df.test, draws = 500)
+
+loo1.pred.hier <- loo(model1_fit_hier_ticket)
+loo2.pred.hier <- loo(model2_fit_hier_ticket)
+
+loo_compare(loo1.pred.hier,loo2.pred.hier)
+
 ppc_dens_overlay(y.train, y_pred1.hier)
-
-mcmc_areas(as.matrix(fit_hier_ticket)[,1:19])
+mcmc_areas(as.matrix(model1_fit_hier_ticket)[,1:19])
 ```
 
 ## 5 - Posterior Predictive Checking
@@ -134,7 +154,14 @@ mcmc_areas(as.matrix(fit_hier_ticket)[,1:19])
 probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
+probs2.hier <- apply(y_pred2.hier, 2, mean)
+preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
+
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
 write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
+          row.names = FALSE)
+
+model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_ticket.csv"),
           row.names = FALSE)
 ```
