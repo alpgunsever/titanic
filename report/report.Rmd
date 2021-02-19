@@ -55,8 +55,11 @@ y.train <- as.numeric(train$Survived) # outcome
 y.train <- y.train-1
 pId.train <- train$PassengerId # ID for predictions
 pId.test <- test$PassengerId # ID for predictions
+
 predictor1.variables <- colnames(train)[3:length(colnames(train))]
 predictor1.variables <- predictor1.variables[predictor1.variables != "Ticket"]
+predictor2.variables <- colnames(train)[3:length(colnames(train))]
+predictor2.variables <- predictor2.variables[predictor2.variables != "title"]
 
 X1 <- subset(train, select=predictor1.variables)
 X1.train <- model.matrix(y.train~., X1)[,-1] #drop int
@@ -65,13 +68,26 @@ X1 <- subset(test, select=predictor1.variables)
 X1.test <- model.matrix(~., X1)[,-1] #drop int
 X1.test <- X1.test[,-12] # removing titleMr
 
+X2 <- subset(train, select=predictor2.variables)
+X2.train <- model.matrix(y.train~., X2)[,-1] #drop int
+X2 <- subset(test, select=predictor2.variables)
+X2.test <- model.matrix(~., X2)[,-1] #drop int
+
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
 colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
+
+colnames(X2.train) <- gsub(" ", "", colnames(X2.train), fixed = TRUE)
+colnames(X2.test) <- gsub(" ", "", colnames(X2.test), fixed = TRUE)
 
 N1.train <- nrow(X1.train)
 K1.train <- ncol(X1.train)
 N1.test <- nrow(X1.test)
 K1.test <- ncol(X1.test)
+
+N2.train <- nrow(X2.train)
+K2.train <- ncol(X2.train)
+N2.test <- nrow(X2.test)
+K2.test <- ncol(X2.test)
 
 for(i in 1:K1.train){
   if (colnames(X1.train)[i] != 'AgeLog' & colnames(X1.train)[i] != 'FareLog') {
@@ -89,8 +105,27 @@ for(i in 1:K1.test){
   }
 }
 
+for(i in 1:K2.train){
+  if (colnames(X2.train)[i] != 'AgeLog' & colnames(X2.train)[i] != 'FareLog') {
+    X2.train[,i] <- scale(X2.train[,i], scale = F)
+  } else{
+    X2.train[,i] <- (X2.train[,i]-mean(X2.train[,i]))/(2*sd(X2.train[,i]))
+  }
+}
+
+for(i in 1:K2.test){
+  if (colnames(X2.test)[i] != 'AgeLog' & colnames(X2.test)[i] != 'FareLog') {
+    X2.test[,i] <- scale(X2.test[,i], scale = F)
+  } else{
+    X2.test[,i] <- (X2.test[,i]-mean(X2.test[,i]))/(2*sd(X2.test[,i]))
+  }
+}
+
 ticketTrain <- as.numeric(train$Ticket)
 ticketTest <- as.numeric(test$Ticket)
+
+titleTrain <- as.numeric(train$title)
+titleTest <- as.numeric(test$title)
 ```
 
 ## 3- Prior Predictive Checking
@@ -99,14 +134,19 @@ ticketTest <- as.numeric(test$Ticket)
 ```{r model1 fitting}
 # model 1 ------------------------------------------------------------------------------------
 ticket <- ticketTrain 
-df.train <- as.data.frame(cbind(y.train, X1.train,ticket))
+df1.train <- as.data.frame(cbind(y.train, X1.train,ticket))
 ticket <- ticketTest
-df.test <- as.data.frame(cbind(X1.test,ticket))
+df1.test <- as.data.frame(cbind(X1.test,ticket))
+
+title <- titleTrain 
+df2.train <- as.data.frame(cbind(y.train, X2.train,title))
+title <- titleTest
+df2.test <- as.data.frame(cbind(X2.test,title))
 
 formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
 
 model1_fit_hier_ticket <- stan_glmer(formula = formula1,
-                              data = df.train, 
+                              data = df1.train, 
                               cores=4,
                               adapt_delta = 0.98,
                               algorithm = "sampling",
@@ -115,10 +155,10 @@ model1_fit_hier_ticket <- stan_glmer(formula = formula1,
                               prior_intercept = student_t(7,0,2.5))
 
 # model 2 ------------------------------------------------------------------------------------
-formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1|ticket)","+(0+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
+formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(1+",paste(colnames(X2.train), collapse = "+"),"|title)"))
 
 model2_fit_hier_ticket <- stan_glmer(formula = formula2,
-                              data = df.train, 
+                              data = df2.train, 
                               cores=4,
                               adapt_delta = 0.98,
                               algorithm = "sampling",
@@ -133,8 +173,8 @@ summary(model1_fit_hier_ticket)
 prior_summary(object = model1_fit_hier_ticket)
 prior_summary(object = model2_fit_hier_ticket)
 
-y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df.test, draws = 500)
-y_pred2.hier <- posterior_predict(model2_fit_hier_ticket, df.test, draws = 500)
+y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df1.test, draws = 500)
+y_pred2.hier <- posterior_predict(model2_fit_hier_ticket, df2.test, draws = 500)
 
 loo1.pred.hier <- loo(model1_fit_hier_ticket)
 loo2.pred.hier <- loo(model2_fit_hier_ticket)
@@ -142,7 +182,10 @@ loo2.pred.hier <- loo(model2_fit_hier_ticket)
 loo_compare(loo1.pred.hier,loo2.pred.hier)
 
 ppc_dens_overlay(y.train, y_pred1.hier)
+ppc_dens_overlay(y.train, y_pred2.hier)
+
 mcmc_areas(as.matrix(model1_fit_hier_ticket)[,1:19])
+mcmc_areas(as.matrix(model2_fit_hier_ticket)[,1:22])
 ```
 
 ## 5 - Posterior Predictive Checking
@@ -162,6 +205,6 @@ write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dro
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_ticket.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
           row.names = FALSE)
 ```
