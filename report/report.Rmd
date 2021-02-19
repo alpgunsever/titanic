@@ -60,24 +60,32 @@ predictor1.variables <- colnames(train)[3:length(colnames(train))]
 predictor1.variables <- predictor1.variables[predictor1.variables != "Ticket"]
 predictor2.variables <- colnames(train)[3:length(colnames(train))]
 predictor2.variables <- predictor2.variables[predictor2.variables != "title"]
+predictor3.variables <- colnames(train)[3:length(colnames(train))]
+predictor3.variables <- predictor3.variables[predictor3.variables != "Pclass"]
 
 X1 <- subset(train, select=predictor1.variables)
 X1.train <- model.matrix(y.train~., X1)[,-1] #drop int
-X1.train <- X1.train[,-12] # removing titleMr
 X1 <- subset(test, select=predictor1.variables)
 X1.test <- model.matrix(~., X1)[,-1] #drop int
-X1.test <- X1.test[,-12] # removing titleMr
 
 X2 <- subset(train, select=predictor2.variables)
 X2.train <- model.matrix(y.train~., X2)[,-1] #drop int
 X2 <- subset(test, select=predictor2.variables)
 X2.test <- model.matrix(~., X2)[,-1] #drop int
 
+X3 <- subset(train, select=predictor3.variables)
+X3.train <- model.matrix(y.train~., X3)[,-1] #drop int
+X3 <- subset(test, select=predictor3.variables)
+X3.test <- model.matrix(~., X3)[,-1] #drop int
+
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
 colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
 
 colnames(X2.train) <- gsub(" ", "", colnames(X2.train), fixed = TRUE)
 colnames(X2.test) <- gsub(" ", "", colnames(X2.test), fixed = TRUE)
+
+colnames(X3.train) <- gsub(" ", "", colnames(X3.train), fixed = TRUE)
+colnames(X3.test) <- gsub(" ", "", colnames(X3.test), fixed = TRUE)
 
 N1.train <- nrow(X1.train)
 K1.train <- ncol(X1.train)
@@ -88,6 +96,11 @@ N2.train <- nrow(X2.train)
 K2.train <- ncol(X2.train)
 N2.test <- nrow(X2.test)
 K2.test <- ncol(X2.test)
+
+N3.train <- nrow(X3.train)
+K3.train <- ncol(X3.train)
+N3.test <- nrow(X3.test)
+K3.test <- ncol(X3.test)
 
 for(i in 1:K1.train){
   if (colnames(X1.train)[i] != 'AgeLog' & colnames(X1.train)[i] != 'FareLog') {
@@ -121,18 +134,37 @@ for(i in 1:K2.test){
   }
 }
 
+for(i in 1:K3.train){
+  if (colnames(X3.train)[i] != 'AgeLog' & colnames(X3.train)[i] != 'FareLog') {
+    X3.train[,i] <- scale(X3.train[,i], scale = F)
+  } else{
+    X3.train[,i] <- (X3.train[,i]-mean(X3.train[,i]))/(2*sd(X3.train[,i]))
+  }
+}
+
+for(i in 1:K3.test){
+  if (colnames(X3.test)[i] != 'AgeLog' & colnames(X3.test)[i] != 'FareLog') {
+    X3.test[,i] <- scale(X3.test[,i], scale = F)
+  } else{
+    X3.test[,i] <- (X3.test[,i]-mean(X3.test[,i]))/(2*sd(X3.test[,i]))
+  }
+}
+
 ticketTrain <- as.numeric(train$Ticket)
 ticketTest <- as.numeric(test$Ticket)
 
 titleTrain <- as.numeric(train$title)
 titleTest <- as.numeric(test$title)
+
+pClassTrain <- as.numeric(train$Pclass)
+pClassTest <- as.numeric(test$Pclass)
 ```
 
 ## 3- Prior Predictive Checking
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model1 fitting}
-# model 1 ------------------------------------------------------------------------------------
+# model 1: hierarchical grouped by ticket---------------------------------------------------------------
 ticket <- ticketTrain 
 df1.train <- as.data.frame(cbind(y.train, X1.train,ticket))
 ticket <- ticketTest
@@ -142,6 +174,11 @@ title <- titleTrain
 df2.train <- as.data.frame(cbind(y.train, X2.train,title))
 title <- titleTest
 df2.test <- as.data.frame(cbind(X2.test,title))
+
+pClass <- pClassTrain 
+df3.train <- as.data.frame(cbind(y.train, X3.train,pClass))
+pClass <- pClassTest
+df3.test <- as.data.frame(cbind(X3.test,title))
 
 formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
 
@@ -154,11 +191,23 @@ model1_fit_hier_ticket <- stan_glmer(formula = formula1,
                               prior = student_t(7,0,2.5),
                               prior_intercept = student_t(7,0,2.5))
 
-# model 2 ------------------------------------------------------------------------------------
+# model 2: hierarchical grouped by title----------------------------------------------------------------
 formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(1+",paste(colnames(X2.train), collapse = "+"),"|title)"))
 
-model2_fit_hier_ticket <- stan_glmer(formula = formula2,
+model2_fit_hier_title <- stan_glmer(formula = formula2,
                               data = df2.train, 
+                              cores=4,
+                              adapt_delta = 0.98,
+                              algorithm = "sampling",
+                              family = binomial(link = "logit"),
+                              prior = student_t(7,0,2.5),
+                              prior_intercept = student_t(7,0,2.5))
+
+# model 2: hierarchical grouped by passenger class----------------------------------------------------------------
+formula3 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X3.train), collapse = "+")),"+(1+",paste(colnames(X3.train), collapse = "+"),"|pClass)"))
+
+model3_fit_hier_pClass <- stan_glmer(formula = formula3,
+                              data = df3.train, 
                               cores=4,
                               adapt_delta = 0.98,
                               algorithm = "sampling",
@@ -171,18 +220,25 @@ model2_fit_hier_ticket <- stan_glmer(formula = formula2,
 ```{r model diagnostics}
 summary(model1_fit_hier_ticket)
 prior_summary(object = model1_fit_hier_ticket)
-prior_summary(object = model2_fit_hier_ticket)
+prior_summary(object = model2_fit_hier_title)
+prior_summary(object = model3_fit_hier_pClass)
 
 y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df1.test, draws = 500)
-y_pred2.hier <- posterior_predict(model2_fit_hier_ticket, df2.test, draws = 500)
+y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test, draws = 500)
+y_pred3.hier <- posterior_predict(model3_fit_hier_title, df3.test, draws = 500)
+yrep1 <- posterior_predict(model1_fit_hier_ticket, draws = 500)
+yrep2 <- posterior_predict(model2_fit_hier_title, draws = 500)
+yrep3 <- posterior_predict(model3_fit_hier_pClass, draws = 500)
 
 loo1.pred.hier <- loo(model1_fit_hier_ticket)
-loo2.pred.hier <- loo(model2_fit_hier_ticket)
+loo2.pred.hier <- loo(model2_fit_hier_title)
+loo3.pred.hier <- loo(model3_fit_hier_pClass)
 
-loo_compare(loo1.pred.hier,loo2.pred.hier)
+loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier)
 
-ppc_dens_overlay(y.train, y_pred1.hier)
-ppc_dens_overlay(y.train, y_pred2.hier)
+ppc_dens_overlay(y.train, yrep1)
+ppc_dens_overlay(y.train, yrep2)
+ppc_dens_overlay(y.train, yrep3)
 
 mcmc_areas(as.matrix(model1_fit_hier_ticket)[,1:19])
 mcmc_areas(as.matrix(model2_fit_hier_ticket)[,1:22])
