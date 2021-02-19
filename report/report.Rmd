@@ -225,7 +225,7 @@ prior_summary(object = model3_fit_hier_pClass)
 
 y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df1.test, draws = 500)
 y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test, draws = 500)
-y_pred3.hier <- posterior_predict(model3_fit_hier_title, df3.test, draws = 500)
+y_pred3.hier <- posterior_predict(model3_fit_hier_pClass, df3.test, draws = 500)
 yrep1 <- posterior_predict(model1_fit_hier_ticket, draws = 500)
 yrep2 <- posterior_predict(model2_fit_hier_title, draws = 500)
 yrep3 <- posterior_predict(model3_fit_hier_pClass, draws = 500)
@@ -256,11 +256,18 @@ preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 probs2.hier <- apply(y_pred2.hier, 2, mean)
 preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
 
+probs3.hier <- apply(y_pred3.hier, 2, mean)
+preds3.hier <- ifelse(probs3.hier > .5, 1, 0)
+
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
 write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
 write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
+          row.names = FALSE)
+
+model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_pClass.csv"),
           row.names = FALSE)
 ```
