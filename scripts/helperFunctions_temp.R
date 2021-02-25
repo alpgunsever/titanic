@@ -14,17 +14,18 @@ cleanTitanicData_temp <- function(dat, dataType){
   dat <- dat[ , -which(names(dat) %in% c("Name"))]
   
   # NAs on Age replaced with median
-  dat$Age[is.na(dat$Age)] <- median(dat$Age[complete.cases(dat$Age)])
+  #dat$Age[is.na(dat$Age)] <- median(dat$Age[complete.cases(dat$Age)])
   
   # factorize cabin variable according to letter
   dat$Cabin <-sapply(dat$Cabin, function(x) substr(x,1,1))
-  dat$Cabin[dat$Cabin==""] <- "Other"
-  dat$Cabin[grepl("F|G|T",dat$Cabin) == TRUE] <- "F"
+  dat$Cabin[dat$Cabin==""] <- NA
+  #dat$Cabin[grepl("F|G|T",dat$Cabin) == TRUE] <- "F"
   dat$Cabin <- as.factor(dat$Cabin)
   
   # factorize embarked variable according to letter
-  dat <- dat[dat$Embarked != "",]
-  dat <- dat[complete.cases(dat$Embarked),]
+  #dat <- dat[dat$Embarked != "",]
+  #dat <- dat[complete.cases(dat$Embarked),]
+  dat$Embarked[dat$Embarked==""] <- NA
   dat$Embarked <- as.factor(dat$Embarked)
   
   # reduce factor size of ticket variable
@@ -39,7 +40,7 @@ cleanTitanicData_temp <- function(dat, dataType){
   #dat$Ticket <- sapply(dat$Ticket, function(x) ifelse(grepl("A|C|F|L|P|S|W",substring(x,1,1))==FALSE,substring(x,1,1),x))
   #dat$Ticket[grepl("1|2|3|A|C|P|S",dat$Ticket) == FALSE] <- "Other"
   dat$Ticket <- sapply(dat$Ticket, function(x) ifelse(nchar(x)>1,as.character(nchar(x)),x))
-  dat$Ticket[grepl("4|5|6|P|C|S",dat$Ticket) == FALSE] <- "Other"
+  #dat$Ticket[grepl("4|5|6|P|C|S",dat$Ticket) == FALSE] <- "Other"
   dat$Ticket <- as.factor(dat$Ticket)
   
   # Create family size variable including the passenger itself
@@ -52,9 +53,9 @@ cleanTitanicData_temp <- function(dat, dataType){
   dat <- dat[ , -which(names(dat) %in% c("familySize"))]
   dat$Fsize <- as.factor(dat$Fsize)
   
-  # Loog transform age and fare variable
+  # Log transform age and fare variable
   dat$AgeLog <- log(dat$Age)
-  dat$Fare[is.na(dat$Fare)] <- median(dat$Fare[complete.cases(dat$Fare)])
+  #dat$Fare[is.na(dat$Fare)] <- median(dat$Fare[complete.cases(dat$Fare)])
   dat$FareLog <- log(dat$Fare+1) # 1 added to avoid log(0)
   dat <- dat[ , -which(names(dat) %in% c("Age","Fare"))]
   

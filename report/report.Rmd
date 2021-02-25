@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "Alp Gunsever"
+author: "alpgu Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -24,6 +24,9 @@ library(corrplot)
 library(rstanarm)
 library(projpred)
 library(bayesplot)
+library(mice)
+library(VIM)
+library(ggplot2)
 theme_set(bayesplot::theme_default(base_family = "sans"))
 ```
 
@@ -44,38 +47,95 @@ train <- cleanTitanicData_temp(dat.train,'train')
 test <- cleanTitanicData_temp(dat.test,'test')
 ```
 
-Then the missing observations will be handled seperately.
+After getting rid of spaces in the character values and factorizing them as well as transforming the numerical variables, now let's look at the data summary.
 
-```{r missing data}
-
+```{r data summary}
+summary(train)
+str(train)
+summary(test)
+str(test)
 ```
 
-```{r input for rstanarm model1}
-y.train <- as.numeric(train$Survived) # outcome
-y.train <- y.train-1
-pId.train <- train$PassengerId # ID for predictions
-pId.test <- test$PassengerId # ID for predictions
+Cabin and age predictors have a lot of missing observations so it might make sense to get rid of these predictors but we will also be losing a lot of information so it makes sense to further investigate if imputation is possible. The first idea that comes to mind about cabin predictor is to check surnames to see if imputation can be partially possible.
 
-predictor1.variables <- colnames(train)[3:length(colnames(train))]
+```{r check surnames for cabin}
+surnames <- str_split_fixed(dat.train$Name, ",", 2)[,1]
+cat_surnames <- as.factor(surnames)
+cat_cabin <- as.factor(dat.train$Cabin)
+summary(cat_surnames)
+
+surnames_cabin <- data.frame(names = dat.train$Name,siblingsSpouses = dat.train$SibSp,parentsChildren=dat.train$Parch,
+                             surnames = cat_surnames,cabin = cat_cabin,fare = dat.train$Fare,pClass = dat.train$Pclass)
+surnames_cabin <- surnames_cabin[order(surnames_cabin$surnames),]
+plot(dat.train$Pclass,dat.train$Fare/(dat.train$SibSp+dat.train$Parch))
+```
+
+It can be seen from the created sub data set that it is not possible to predict the cabin type by using surnames because of huge amount of missing data. However, it can also be seen that using surnames to make a new variable can be as useful compared to using the cabin variable as the correlation between the survivalability of the same family members can be expected to be high. The advantage of the cabin type would be to correlate with the location on the ship which is a determinng factor for survivability. 
+
+We will use mice package for imputing the training and the test sets.
+
+```{r missing data}
+md.pattern(train, rotate.names = TRUE)
+md.pattern(test, rotate.names = TRUE)
+
+train <- train[ , !(names(train) %in% c("Cabin","AgeLog"))]
+test <- test[ , !(names(test) %in% c("Cabin","AgeLog"))]
+
+imp_train <- mice(train, maxit = 40,printFlag = FALSE)
+summary(imp_train)
+imp_train$method
+plot(imp_train)
+densityplot(imp_train, ~ Embarked)
+stripplot(imp_train, Embarked ~ .imp, pch = 20, cex = 2)
+train_imp <- complete(imp_train)
+
+imp_test <- mice(test, maxit = 40,printFlag = FALSE)
+summary(imp_test)
+imp_test$method
+plot(imp_test)
+stripplot(imp_test, FareLog ~ .imp, pch = 20, cex = 2)
+test_imp <- complete(imp_test)
+```
+
+
+```{r data visualizations}
+#Extract numeric variables
+num_var_names <- colnames(train)[sapply(train[,colnames(train)],class) %in% c("numeric","integer")]
+train_num <- train[,num_var_names]
+
+#Extract categorical variables
+cat_var_names <- colnames(train)[sapply(train[,colnames(train)],class) %in% c("factor","character")]
+train_cat <- train[,cat_var_names]
+```
+
+
+
+```{r input for rstanarm model1}
+y.train <- as.numeric(train_imp$Survived) # outcome
+y.train <- y.train-1
+pId.train <- train_imp$PassengerId # ID for predictions
+pId.test <- test_imp$PassengerId # ID for predictions
+
+predictor1.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor1.variables <- predictor1.variables[predictor1.variables != "Ticket"]
-predictor2.variables <- colnames(train)[3:length(colnames(train))]
+predictor2.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor2.variables <- predictor2.variables[predictor2.variables != "title"]
-predictor3.variables <- colnames(train)[3:length(colnames(train))]
+predictor3.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor3.variables <- predictor3.variables[predictor3.variables != "Pclass"]
 
-X1 <- subset(train, select=predictor1.variables)
+X1 <- subset(train_imp, select=predictor1.variables)
 X1.train <- model.matrix(y.train~., X1)[,-1] #drop int
-X1 <- subset(test, select=predictor1.variables)
+X1 <- subset(test_imp, select=predictor1.variables)
 X1.test <- model.matrix(~., X1)[,-1] #drop int
 
-X2 <- subset(train, select=predictor2.variables)
+X2 <- subset(train_imp, select=predictor2.variables)
 X2.train <- model.matrix(y.train~., X2)[,-1] #drop int
-X2 <- subset(test, select=predictor2.variables)
+X2 <- subset(test_imp, select=predictor2.variables)
 X2.test <- model.matrix(~., X2)[,-1] #drop int
 
-X3 <- subset(train, select=predictor3.variables)
+X3 <- subset(train_imp, select=predictor3.variables)
 X3.train <- model.matrix(y.train~., X3)[,-1] #drop int
-X3 <- subset(test, select=predictor3.variables)
+X3 <- subset(test_imp, select=predictor3.variables)
 X3.test <- model.matrix(~., X3)[,-1] #drop int
 
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
@@ -150,14 +210,14 @@ for(i in 1:K3.test){
   }
 }
 
-ticketTrain <- as.numeric(train$Ticket)
-ticketTest <- as.numeric(test$Ticket)
+ticketTrain <- as.numeric(train_imp$Ticket)
+ticketTest <- as.numeric(test_imp$Ticket)
 
-titleTrain <- as.numeric(train$title)
-titleTest <- as.numeric(test$title)
+titleTrain <- as.numeric(train_imp$title)
+titleTest <- as.numeric(test_imp$title)
 
-pClassTrain <- as.numeric(train$Pclass)
-pClassTest <- as.numeric(test$Pclass)
+pClassTrain <- as.numeric(train_imp$Pclass)
+pClassTest <- as.numeric(test_imp$Pclass)
 ```
 
 ## 3- Prior Predictive Checking
@@ -178,7 +238,7 @@ df2.test <- as.data.frame(cbind(X2.test,title))
 pClass <- pClassTrain 
 df3.train <- as.data.frame(cbind(y.train, X3.train,pClass))
 pClass <- pClassTest
-df3.test <- as.data.frame(cbind(X3.test,title))
+df3.test <- as.data.frame(cbind(X3.test,pClass))
 
 formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|ticket)"))
 
@@ -223,12 +283,12 @@ prior_summary(object = model1_fit_hier_ticket)
 prior_summary(object = model2_fit_hier_title)
 prior_summary(object = model3_fit_hier_pClass)
 
-y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df1.test, draws = 500)
-y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test, draws = 500)
-y_pred3.hier <- posterior_predict(model3_fit_hier_pClass, df3.test, draws = 500)
-yrep1 <- posterior_predict(model1_fit_hier_ticket, draws = 500)
-yrep2 <- posterior_predict(model2_fit_hier_title, draws = 500)
-yrep3 <- posterior_predict(model3_fit_hier_pClass, draws = 500)
+y_pred1.hier <- posterior_predict(model1_fit_hier_ticket, df1.test)
+y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test)
+y_pred3.hier <- posterior_predict(model3_fit_hier_pClass, df3.test)
+yrep1 <- posterior_predict(model1_fit_hier_ticket)
+yrep2 <- posterior_predict(model2_fit_hier_title)
+yrep3 <- posterior_predict(model3_fit_hier_pClass)
 
 loo1.pred.hier <- loo(model1_fit_hier_ticket)
 loo2.pred.hier <- loo(model2_fit_hier_title)
