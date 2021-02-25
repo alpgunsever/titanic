@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "alpgu Gunsever"
+author: "Alp Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -19,7 +19,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
-source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
+source(file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
 library(corrplot)
 library(rstanarm)
 library(projpred)
@@ -37,26 +37,75 @@ We are first going to make an exploratory analysis on the data available at hand
 The existing observations for different predictors will be formatted into data structures that can be handled by R in a meaningful way. 
 
 ```{r clean data}
-# read train data
-dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+# read train and test data
+dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
+# combine train and test data for cleaning
+dat.train_without_survival <- cbind(data.frame(PassengerId=dat.train[,1]),dat.train[,3:length(colnames(dat.train))])
+dat.full <- rbind(dat.train_without_survival, dat.test)
+
 # adjustments on data set
-train <- cleanTitanicData_temp(dat.train,'train')
-test <- cleanTitanicData_temp(dat.test,'test')
+
+# factorize Pclass variable
+dat.full$Pclass <- as.factor(dat.full$Pclass)
+
+# extract titles from names
+dat.full$title <- str_split_fixed(as.character(str_split_fixed(dat.full$Name, ",", 2)[,2]),". ",2)[,1]
+dat.full$title <- as.factor(dat.full$title)
+
+# factorize cabin variable according to letter
+dat.full$Cabin <-sapply(dat.full$Cabin, function(x) substr(x,1,1))
+dat.full$Cabin[dat.full$Cabin==""] <- NA
+dat.full$Cabin <- as.factor(dat.full$Cabin)
+
+# factorize embarked variable according to letter
+dat.full$Embarked[dat.full$Embarked==""] <- NA
+dat.full$Embarked <- as.factor(dat.full$Embarked)
+
+# reduce factor size of ticket variable
+dat.full$Ticket <- as.character(dat.full$Ticket)
+dat.full$Ticket[grepl("L",dat.full$Ticket) == TRUE] <- "L"
+dat.full$Ticket[grepl("F",dat.full$Ticket) == TRUE] <- "F"
+dat.full$Ticket[grepl("PC|P",dat.full$Ticket) == TRUE] <- "P"
+dat.full$Ticket[grepl("CA|C.A.|CA.|C ",dat.full$Ticket) == TRUE] <- "C"
+dat.full$Ticket[grepl("A/5|A/5.|A.5.|A./5.|A/4.|A4.|A|A.|AQ",dat.full$Ticket) == TRUE] <- "A"
+dat.full$Ticket[grepl("S",dat.full$Ticket) == TRUE] <- "S"
+dat.full$Ticket[grepl("W",dat.full$Ticket) == TRUE] <- "W"
+dat.full$Ticket <- sapply(dat.full$Ticket, function(x) ifelse(nchar(x)>1,as.character(nchar(x)),x))
+dat.full$Ticket <- as.factor(dat.full$Ticket)
+
+# Create family size variable including the passenger itself
+dat.full <- transform(dat.full, 'fSize' =  SibSp + Parch +1)
+dat.full <- dat.full[ , -which(names(dat.full) %in% c("SibSp","Parch"))]
+
+# Change sex variable to more understandable isMale variable
+dat.full$isMale <- NA
+dat.full$isMale[dat.full$Sex == "male"] <- 1
+dat.full$isMale[dat.full$Sex <= "female"] <- 0
+dat.full$isMale <- as.factor(dat.full$isMale)
+dat.full <- dat.full[ , -which(names(dat.full) %in% c("Sex"))]
+
+# creating surnames variable from names variable and deleting the names variable
+surnames <- str_split_fixed(dat.full$Name, ",", 2)[,1]
+cat_surnames <- as.factor(surnames)
+dat.full$surnames <- cat_surnames
+dat.full <- dat.full[ , -which(names(dat.full) %in% c("Name"))]
 ```
 
 After getting rid of spaces in the character values and factorizing them as well as transforming the numerical variables, now let's look at the data summary.
 
 ```{r data summary}
-summary(train)
-str(train)
-summary(test)
-str(test)
+summary(dat.full)
+str(dat.full)
 ```
 
 Cabin and age predictors have a lot of missing observations so it might make sense to get rid of these predictors but we will also be losing a lot of information so it makes sense to further investigate if imputation is possible. The first idea that comes to mind about cabin predictor is to check surnames to see if imputation can be partially possible.
+
+```{r visual check with available data}
+
+```
 
 ```{r check surnames for cabin}
 surnames <- str_split_fixed(dat.train$Name, ",", 2)[,1]
@@ -320,14 +369,14 @@ probs3.hier <- apply(y_pred3.hier, 2, mean)
 preds3.hier <- ifelse(probs3.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
           row.names = FALSE)
 
 model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
-write.csv(x = model3_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_pClass.csv"),
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_pClass.csv"),
           row.names = FALSE)
 ```
