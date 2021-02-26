@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "Alp Gunsever"
+author: "alpgu Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -19,7 +19,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
-source(file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
+#source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
 library(corrplot)
 library(rstanarm)
 library(projpred)
@@ -28,6 +28,8 @@ library(mice)
 library(VIM)
 library(ggplot2)
 theme_set(bayesplot::theme_default(base_family = "sans"))
+library(dplyr)
+library(gridExtra)
 ```
 
 ## 2- Exploratory Data Analysis
@@ -38,7 +40,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -53,6 +55,20 @@ dat.full$Pclass <- as.factor(dat.full$Pclass)
 
 # extract titles from names
 dat.full$title <- str_split_fixed(as.character(str_split_fixed(dat.full$Name, ",", 2)[,2]),". ",2)[,1]
+dat.full$title[760] <- "Countess"
+for (i in 1:length(dat.full$title)){
+  if(grepl("Mr|Mrs|Miss|Master",dat.full$title[i]) == F){
+    if(grepl("Countess|Sir|Lady|Don",dat.full$title[i]) == T){
+      dat.full$title[i] <- "Noble"
+    }
+    else if(grepl("Capt|Col|Major",dat.full$title[i]) == T){
+      dat.full$title[i] <- "Soldier"
+    } 
+    else {
+      dat.full$title[i] <- "Other"  
+    }
+  } 
+}
 dat.full$title <- as.factor(dat.full$title)
 
 # factorize cabin variable according to letter
@@ -77,8 +93,14 @@ dat.full$Ticket <- sapply(dat.full$Ticket, function(x) ifelse(nchar(x)>1,as.char
 dat.full$Ticket <- as.factor(dat.full$Ticket)
 
 # Create family size variable including the passenger itself
-dat.full <- transform(dat.full, 'fSize' =  SibSp + Parch +1)
+dat.full <- transform(dat.full, 'familySize' =  SibSp + Parch +1)
 dat.full <- dat.full[ , -which(names(dat.full) %in% c("SibSp","Parch"))]
+dat.full$fSize <- NA
+dat.full$fSize[dat.full$familySize == 1] <- 'singleton'
+dat.full$fSize[dat.full$familySize <= 4 & dat.full$familySize > 1] <- 'small'
+dat.full$fSize[dat.full$familySize > 4] <- 'large'
+dat.full <- dat.full[ , -which(names(dat.full) %in% c("familySize"))]
+dat.full$fSize <- as.factor(dat.full$fSize)
 
 # Change sex variable to more understandable isMale variable
 dat.full$isMale <- NA
@@ -104,8 +126,44 @@ str(dat.full)
 Cabin and age predictors have a lot of missing observations so it might make sense to get rid of these predictors but we will also be losing a lot of information so it makes sense to further investigate if imputation is possible. The first idea that comes to mind about cabin predictor is to check surnames to see if imputation can be partially possible.
 
 ```{r visual check with available data}
+dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
+g <- ggplot()
+title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = mean(Age, na.rm = T))
+p1 <- g + geom_col(data = title_avAge,aes(x=title,y=avAge),fill = "deepskyblue3")
+p2 <- g + geom_col(data = title_avAge,aes(x=title,y=n),fill = "salmon3")
+grid.arrange(p1,p2, ncol=2)
 
+survtitle1 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "stack")
+survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "fill")
+grid.arrange(survtitle1,survtitle2, ncol=2)
+
+ticket_avFare <- dat.full.train %>% group_by(Ticket) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
+g + geom_col(data = ticket_avFare,aes(x=Ticket,y=avFare),fill = "deepskyblue3")
+
+survClass1 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "stack")
+survClass2 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "fill")
+grid.arrange(survClass1,survClass2, ncol=2)
+
+survCabin1 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "stack")
+survCabin2 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "fill")
+grid.arrange(survCabin1,survCabin2, ncol=2)
+
+survTicket1 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "stack")
+survTicket2 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "fill")
+grid.arrange(survTicket1,survTicket2, ncol=2)
+
+g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Cabin), position = "stack")
+g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Cabin), position = "stack")
+g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Ticket), position = "stack")
+
+g + geom_boxplot(data = dat.full.train, aes(x=Survived, y = Age))
+
+survfSize1 <- g + geom_bar(data = dat.full.train, aes(x=fSize, fill = Survived), position = "stack")
+survfSize2 <- g + geom_bar(data = dat.full.train, aes(x=fSize, fill = Survived), position = "fill")
+grid.arrange(survfSize1,survfSize2, ncol=2)
 ```
+
+
 
 ```{r check surnames for cabin}
 surnames <- str_split_fixed(dat.train$Name, ",", 2)[,1]
@@ -369,14 +427,14 @@ probs3.hier <- apply(y_pred3.hier, 2, mean)
 preds3.hier <- ifelse(probs3.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_ticket.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
           row.names = FALSE)
 
 model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
-write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_pClass.csv"),
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_pClass.csv"),
           row.names = FALSE)
 ```
