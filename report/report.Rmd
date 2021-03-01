@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "alpgu Gunsever"
+author: "Alp Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -19,7 +19,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
-#source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
+#source(file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
 library(corrplot)
 library(rstanarm)
 library(projpred)
@@ -40,7 +40,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -172,9 +172,10 @@ survEmbarked2 <- g + geom_bar(data = dat.full.train, aes(x=Embarked, fill = Surv
 grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
 ```
 
-We will impute the missing age observations by replacing them with median of each title that the idividual belongs to.
+We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
 
 ```{r visual check with available data2}
+#Imputing the age variable
 for (i in 1:length(dat.full$Age)){
   if(is.na(dat.full$Age[i])==T){
     if(dat.full$title[i] == "Master") dat.full$Age[i] = title_avAge[1,4]
@@ -185,17 +186,10 @@ for (i in 1:length(dat.full$Age)){
     if(dat.full$title[i] == "Soldier") dat.full$Age[i] = title_avAge[6,4]
   }
 }
-
-# Create discrete variable out of discrete numeric variable age
-dat.full$ageG[dat.full$Age <25] <- 'young'
-dat.full$ageG[dat.full$Age < 60 & dat.full$Age >= 25] <- 'middleAged'
-dat.full$ageG[dat.full$Age >= 60] <- 'old'
-dat.full$ageG <- as.factor(dat.full$ageG)
+dat.full$Age <- as.numeric(dat.full$Age)
 
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
-survageG1 <- g + geom_bar(data = dat.full.train, aes(x=ageG, fill = Survived), position = "stack")
-survageG2 <- g + geom_bar(data = dat.full.train, aes(x=ageG, fill = Survived), position = "fill")
-grid.arrange(survageG1,survageG2, ncol=2)
+g + geom_boxplot(data = dat.full.train, aes(Survived, Age))
 ```
 
 Individuals that are upper class passengers, are members of small families(2 to 4 family members), embarked from C and are below 60 years old tend to have higher survival rates. 
@@ -203,7 +197,7 @@ Individuals that are upper class passengers, are members of small families(2 to 
 Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor and create a factorized variable out of the discrete numeric variable.
 
 ```{r missing data}
-dat.full <- dat.full[ , !(names(dat.full) %in% c("Cabin","Age"))]
+dat.full <- dat.full[ , !(names(dat.full) %in% c("Cabin"))]
 md.pattern(dat.full, rotate.names = TRUE)
 
 imp_full <- mice(dat.full, m = 20, maxit = 40,printFlag = FALSE)
@@ -213,8 +207,8 @@ plot(imp_full)
 dat.full_imp <- complete(imp_full)
 
 # Log transform continuous fare variabæe
-dat.full_imp$FareLog <- log(dat.full_imp$Fare+1) # 1 added to avoid log(0)
-dat.full_imp <- dat.full_imp[ , -which(names(dat.full_imp) %in% c("Fare"))]
+#dat.full_imp$FareLog <- log(dat.full_imp$Fare+1) # 1 added to avoid log(0)
+#dat.full_imp <- dat.full_imp[ , -which(names(dat.full_imp) %in% c("Fare"))]
 
 train_imp <- data.frame(PassengerId = dat.full_imp[1:891,1], Survived = as.factor(dat.train[,2]), dat.full_imp[1:891,2:9])
 test_imp <- dat.full_imp[892:1309,]
@@ -330,8 +324,8 @@ loo_compare(loo1.pred.hier,loo2.pred.hier)
 ppc_dens_overlay(y.train, yrep1)
 ppc_dens_overlay(y.train, yrep2)
 
-#mcmc_areas(as.matrix(model1_fit_hier_ticket)[,1:19])
-#mcmc_areas(as.matrix(model2_fit_hier_ticket)[,1:22])
+mcmc_areas(as.matrix(model1_fit_hier_pClass)[,1:length(colnames(df1.train))])
+mcmc_areas(as.matrix(model2_fit_hier_ticket)[,1:length(colnames(df2.train))])
 ```
 
 ## 5 - Posterior Predictive Checking
@@ -347,10 +341,10 @@ probs2.hier <- apply(y_pred2.hier, 2, mean)
 preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_pClass.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_pClass.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
           row.names = FALSE)
 ```
