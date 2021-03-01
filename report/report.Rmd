@@ -198,7 +198,7 @@ survageG2 <- g + geom_bar(data = dat.full.train, aes(x=ageG, fill = Survived), p
 grid.arrange(survageG1,survageG2, ncol=2)
 ```
 
-Individuals that are upper class passengers, are members of small families, embarked from C and are not old tend to have higher survival rates. 
+Individuals that are upper class passengers, are members of small families(2 to 4 family members), embarked from C and are below 60 years old tend to have higher survival rates. 
 
 Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor and create a factorized variable out of the discrete numeric variable.
 
@@ -231,24 +231,46 @@ pId.test <- test_imp$PassengerId # ID for predictions
 predictor1.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor1.variables <- predictor1.variables[predictor1.variables != "Pclass"]
 
+predictor2.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
+predictor2.variables <- predictor2.variables[predictor2.variables != "title"]
+
 X1 <- subset(train_imp, select=predictor1.variables)
 X1.train <- model.matrix(y.train~., X1)[,-1] #drop int
 X1 <- subset(test_imp, select=predictor1.variables)
 X1.test <- model.matrix(~., X1)[,-1] #drop int
 
+X2 <- subset(train_imp, select=predictor2.variables)
+X2.train <- model.matrix(y.train~., X2)[,-1] #drop int
+X2 <- subset(test_imp, select=predictor2.variables)
+X2.test <- model.matrix(~., X2)[,-1] #drop int
+
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
 colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
+
+colnames(X2.train) <- gsub(" ", "", colnames(X2.train), fixed = TRUE)
+colnames(X2.test) <- gsub(" ", "", colnames(X2.test), fixed = TRUE)
 
 N1.train <- nrow(X1.train)
 K1.train <- ncol(X1.train)
 N1.test <- nrow(X1.test)
 K1.test <- ncol(X1.test)
 
+N2.train <- nrow(X2.train)
+K2.train <- ncol(X2.train)
+N2.test <- nrow(X2.test)
+K2.test <- ncol(X2.test)
+
 X1.train <- scale(X1.train)
 X1.test <- scale(X1.test)
 
+X2.train <- scale(X2.train)
+X2.test <- scale(X2.test)
+
 pClassTrain <- as.numeric(train_imp$Pclass)
 pClassTest <- as.numeric(test_imp$Pclass)
+
+titleTrain <- as.numeric(train_imp$title)
+titleTest <- as.numeric(test_imp$title)
 ```
 
 ## 3- Prior Predictive Checking
@@ -271,6 +293,23 @@ model1_fit_hier_pClass <- stan_glmer(formula = formula1,
                               family = binomial(link = "logit"),
                               prior = student_t(7,0,2.5),
                               prior_intercept = student_t(7,0,2.5))
+
+# model 2: hierarchical grouped by title---------------------------------------------------------------
+title <- titleTrain 
+df2.train <- as.data.frame(cbind(y.train, X2.train,title))
+title <- titleTest
+df2.test <- as.data.frame(cbind(X2.test,title))
+
+formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(1+",paste(colnames(X2.train), collapse = "+"),"|title)"))
+
+model2_fit_hier_title <- stan_glmer(formula = formula2,
+                              data = df2.train, 
+                              cores=4,
+                              adapt_delta = 0.98,
+                              algorithm = "sampling",
+                              family = binomial(link = "logit"),
+                              prior = student_t(7,0,2.5),
+                              prior_intercept = student_t(7,0,2.5))
 ```
 
 ```{r model diagnostics}
@@ -278,13 +317,18 @@ summary(model1_fit_hier_pClass)
 prior_summary(object = model1_fit_hier_pClass)
 
 y_pred1.hier <- posterior_predict(model1_fit_hier_pClass, df1.test)
+y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test)
+
 yrep1 <- posterior_predict(model1_fit_hier_pClass)
+yrep2 <- posterior_predict(model2_fit_hier_title)
 
 loo1.pred.hier <- loo(model1_fit_hier_pClass)
+loo2.pred.hier <- loo(model2_fit_hier_title)
 
-#loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier)
+loo_compare(loo1.pred.hier,loo2.pred.hier)
 
 ppc_dens_overlay(y.train, yrep1)
+ppc_dens_overlay(y.train, yrep2)
 
 #mcmc_areas(as.matrix(model1_fit_hier_ticket)[,1:19])
 #mcmc_areas(as.matrix(model2_fit_hier_ticket)[,1:22])
@@ -299,7 +343,14 @@ ppc_dens_overlay(y.train, yrep1)
 probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
+probs2.hier <- apply(y_pred2.hier, 2, mean)
+preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
+
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
 write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_pClass.csv"),
+          row.names = FALSE)
+
+model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
           row.names = FALSE)
 ```
