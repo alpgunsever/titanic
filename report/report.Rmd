@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "alpgu Gunsever"
+author: "Alp Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -19,9 +19,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
-#source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
 library(corrplot)
-library(rstanarm)
 library(projpred)
 library(bayesplot)
 library(mice)
@@ -40,7 +38,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -194,7 +192,7 @@ g + geom_boxplot(data = dat.full.train, aes(Survived, Age))
 
 Individuals that are upper class passengers, are members of small families(2 to 4 family members), embarked from C and are below 60 years old tend to have higher survival rates. 
 
-Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor and create a factorized variable out of the discrete numeric variable.
+Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor.
 
 ```{r missing data}
 dat.full <- dat.full[ , !(names(dat.full) %in% c("Cabin"))]
@@ -206,9 +204,10 @@ imp_full$method
 plot(imp_full)
 dat.full_imp <- complete(imp_full)
 
-# Log transform continuous fare variabæe
-#dat.full_imp$FareLog <- log(dat.full_imp$Fare+1) # 1 added to avoid log(0)
-#dat.full_imp <- dat.full_imp[ , -which(names(dat.full_imp) %in% c("Fare"))]
+# Log transform continuous age and fare variable
+dat.full_imp$FareLog <- log(dat.full_imp$Fare+1) # 1 added to avoid log(0)
+dat.full_imp$AgeLog <- log(dat.full_imp$Age+1) # 1 added to avoid log(0)
+dat.full_imp <- dat.full_imp[ , -which(names(dat.full_imp) %in% c("Age","Fare"))]
 
 train_imp <- data.frame(PassengerId = dat.full_imp[1:891,1], Survived = as.factor(dat.train[,2]), dat.full_imp[1:891,2:9])
 test_imp <- dat.full_imp[892:1309,]
@@ -222,49 +221,48 @@ y.train <- y.train-1
 pId.train <- train_imp$PassengerId # ID for predictions
 pId.test <- test_imp$PassengerId # ID for predictions
 
-predictor1.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
-predictor1.variables <- predictor1.variables[predictor1.variables != "Pclass"]
+predictor.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 
-predictor2.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
-predictor2.variables <- predictor2.variables[predictor2.variables != "title"]
+X <- subset(train_imp, select=predictor.variables)
+X.train <- model.matrix(y.train~ ., data = X,
+                        contrasts.arg = lapply(X[,1:6], contrasts, contrasts=FALSE))
+X <- subset(test_imp, select=predictor.variables)
+X.test <- model.matrix(~ ., data = X,
+                        contrasts.arg = lapply(X[,1:6], contrasts, contrasts=FALSE))
 
-X1 <- subset(train_imp, select=predictor1.variables)
-X1.train <- model.matrix(y.train~., X1)[,-1] #drop int
-X1 <- subset(test_imp, select=predictor1.variables)
-X1.test <- model.matrix(~., X1)[,-1] #drop int
+colnames(X.train) <- gsub(" ", "", colnames(X.train), fixed = TRUE)
+colnames(X.test) <- gsub(" ", "", colnames(X.test), fixed = TRUE)
 
-X2 <- subset(train_imp, select=predictor2.variables)
-X2.train <- model.matrix(y.train~., X2)[,-1] #drop int
-X2 <- subset(test_imp, select=predictor2.variables)
-X2.test <- model.matrix(~., X2)[,-1] #drop int
+N.train <- nrow(X.train)
+K.train <- ncol(X.train)
+N.test <- nrow(X.test)
+K.test <- ncol(X.test)
 
-colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
-colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
+for(i in 2:K.train){
+  if (colnames(X.train)[i] != 'AgeLog' & colnames(X.train)[i] != 'FareLog'){
+    X.train[,i] <- scale(X.train[,i], scale = F)  
+  }
+  else{
+    X.train[,i] <- (X.train[,i]-mean(X.train[,i]))/(2*sd(X.train[,i]))	    
+  }
+}
 
-colnames(X2.train) <- gsub(" ", "", colnames(X2.train), fixed = TRUE)
-colnames(X2.test) <- gsub(" ", "", colnames(X2.test), fixed = TRUE)
-
-N1.train <- nrow(X1.train)
-K1.train <- ncol(X1.train)
-N1.test <- nrow(X1.test)
-K1.test <- ncol(X1.test)
-
-N2.train <- nrow(X2.train)
-K2.train <- ncol(X2.train)
-N2.test <- nrow(X2.test)
-K2.test <- ncol(X2.test)
-
-X1.train <- scale(X1.train)
-X1.test <- scale(X1.test)
-
-X2.train <- scale(X2.train)
-X2.test <- scale(X2.test)
-
-pClassTrain <- as.numeric(train_imp$Pclass)
-pClassTest <- as.numeric(test_imp$Pclass)
+for(i in 2:K.test){
+  if (colnames(X.test)[i] != 'AgeLog' & colnames(X.test)[i] != 'FareLog'){
+    X.test[,i] <- scale(X.test[,i], scale = F)  
+  }
+  else{
+    X.test[,i] <- (X.test[,i]-mean(X.test[,i]))/(2*sd(X.test[,i]))	    
+  }
+}
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
+J1 <- length(levels(train_imp$title))
+
+pClassTrain <- as.numeric(train_imp$Pclass)
+pClassTest <- as.numeric(test_imp$Pclass)
+J2 <- length(levels(train_imp$Pclass))
 ```
 
 ## 3- Prior Predictive Checking
@@ -278,88 +276,37 @@ train_imp_ppc <- train_imp %>% select(-c(PassengerId, Survived))
 n <- nrow(train_imp_ppc)
 train_imp_ppc$Survived_ppc <- rbinom(n,1,0.5)
 
-fit_nonHier
 ```
-
-
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model1 fitting}
-# model 1: hierarchical grouped by pClass---------------------------------------------------------------
-pClass <- pClassTrain 
-df1.train <- as.data.frame(cbind(y.train, X1.train,pClass))
-pClass <- pClassTest
-df1.test <- as.data.frame(cbind(X1.test,pClass))
+# model 1: hierarchical grouped by title---------------------------------------------------------------
+stanFile <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","multivariate_hier_model.stan")
+multi_hier_model <- stan_model(stanFile)
 
-formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|pClass)"))
+options(mc.cores = 4)
+multi_hier1_title_post.fit <- sampling(multi_hier_model,list(Ntrain=N.train,Ntest=N.test,K = K.train,J=J1,
+                                   jjtrain=titleTrain,jjtest=titleTest,xtrain=X.train,xtest=X.test,y=y.train),
+                     iter = 2000, chains = 4, warmup = 1000,
+                     control = list(adapt_delta = 0.99, max_treedepth = 20))
 
-model1_fit_hier_pClass <- stan_glmer(formula = formula1,
-                              data = df1.train, 
-                              cores=4,
-                              adapt_delta = 0.98,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5),
-                              prior_intercept = student_t(7,0,2.5),
-                              prior_covariance = decov(regularization = 2),
-                              QR=T)
+# model 2: hierarchical grouped by Pclass---------------------------------------------------------------
 
-# model 2: hierarchical grouped by title---------------------------------------------------------------
-title <- titleTrain 
-df2.train <- as.data.frame(cbind(y.train, X2.train,title))
-title <- titleTest
-df2.test <- as.data.frame(cbind(X2.test,title))
 
-formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(1+",paste(colnames(X2.train), collapse = "+"),"|title)"))
-
-model2_fit_hier_title <- stan_glmer(formula = formula2,
-                              data = df2.train, 
-                              cores=4,
-                              adapt_delta = 0.98,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5),
-                              prior_intercept = student_t(7,0,2.5),
-                              prior_covariance = decov(regularization = 0.1),
-                              QR=T)
 ```
 
 ```{r model diagnostics}
-summary(model1_fit_hier_pClass)
-prior_summary(object = model1_fit_hier_pClass)
+print(multi_hier1_title_post.fit, probs = c(0.25,0.5,0.75))
 
-summary(model2_fit_hier_title)
-prior_summary(object = model2_fit_hier_title)
-
-# assign to object and customize with functions from ggplot2
-(gg1 <- posterior_vs_prior(model1_fit_hier_pClass, pars = c("beta", "varying"), prob = 0.95))
-(gg2 <- posterior_vs_prior(model2_fit_hier_title, pars = c("beta", "varying"), prob = 0.95))
-gg1 +
- ggplot2::geom_hline(yintercept = 0, size = 0.3, linetype = 3) +
- ggplot2::coord_flip() +
- ggplot2::ggtitle("Comparing the prior and posterior")
-
-gg2 +
- ggplot2::geom_hline(yintercept = 0, size = 0.3, linetype = 3) +
- ggplot2::coord_flip() +
- ggplot2::ggtitle("Comparing the prior and posterior")
-
-y_pred1.hier <- posterior_predict(model1_fit_hier_pClass, df1.test)
-y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test)
-
-yrep1 <- posterior_predict(model1_fit_hier_pClass)
-yrep2 <- posterior_predict(model2_fit_hier_title)
+params1.hier <- extract(multi_hier1_title_post.fit)
+y_pred1.hier <- params1.hier$pred_Survival
 
 loo1.pred.hier <- loo(model1_fit_hier_pClass)
-loo2.pred.hier <- loo(model2_fit_hier_title)
 
-loo_compare(loo1.pred.hier,loo2.pred.hier)
+#loo_compare(loo1.pred.hier,loo2.pred.hier)
 
-ppc_dens_overlay(y.train, yrep1)
-ppc_dens_overlay(y.train, yrep2)
-
-mcmc_areas(as.matrix(model1_fit_hier_pClass)[,1:length(colnames(df1.train))])
-mcmc_areas(as.matrix(model2_fit_hier_title)[,1:length(colnames(df2.train))])
+# Checking posterior draws of normalized intercepts
+mcmc_pairs(multi_hier1_title_post.fit, pars = c("mu[1,1]","mu[2,1]","mu[3,1]","mu[4,1]","mu[5,1]","mu[6,1]"))
 ```
 
 ## 5 - Posterior Predictive Checking
@@ -371,14 +318,7 @@ mcmc_areas(as.matrix(model2_fit_hier_title)[,1:length(colnames(df2.train))])
 probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
-probs2.hier <- apply(y_pred2.hier, 2, mean)
-preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
-
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_pClass.csv"),
-          row.names = FALSE)
-
-model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
           row.names = FALSE)
 ```
