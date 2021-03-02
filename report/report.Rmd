@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "Alp Gunsever"
+author: "alpgu Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -19,7 +19,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(shinystan)
 library(stringr)
-#source(file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
+#source(file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","helperFunctions_temp.R"))
 library(corrplot)
 library(rstanarm)
 library(projpred)
@@ -40,7 +40,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -269,6 +269,20 @@ titleTest <- as.numeric(test_imp$title)
 
 ## 3- Prior Predictive Checking
 
+We will perform a prior predictive check with only using the priors and no data.
+
+```{r prior predictive checking}
+set.seed(187)
+# Replacing the survival variable with random binomial to be able to compare them with null model
+train_imp_ppc <- train_imp %>% select(-c(PassengerId, Survived))
+n <- nrow(train_imp_ppc)
+train_imp_ppc$Survived_ppc <- rbinom(n,1,0.5)
+
+fit_nonHier
+```
+
+
+
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model1 fitting}
 # model 1: hierarchical grouped by pClass---------------------------------------------------------------
@@ -286,7 +300,9 @@ model1_fit_hier_pClass <- stan_glmer(formula = formula1,
                               algorithm = "sampling",
                               family = binomial(link = "logit"),
                               prior = student_t(7,0,2.5),
-                              prior_intercept = student_t(7,0,2.5))
+                              prior_intercept = student_t(7,0,2.5),
+                              prior_covariance = decov(regularization = 2),
+                              QR=T)
 
 # model 2: hierarchical grouped by title---------------------------------------------------------------
 title <- titleTrain 
@@ -303,12 +319,30 @@ model2_fit_hier_title <- stan_glmer(formula = formula2,
                               algorithm = "sampling",
                               family = binomial(link = "logit"),
                               prior = student_t(7,0,2.5),
-                              prior_intercept = student_t(7,0,2.5))
+                              prior_intercept = student_t(7,0,2.5),
+                              prior_covariance = decov(regularization = 0.1),
+                              QR=T)
 ```
 
 ```{r model diagnostics}
 summary(model1_fit_hier_pClass)
 prior_summary(object = model1_fit_hier_pClass)
+
+summary(model2_fit_hier_title)
+prior_summary(object = model2_fit_hier_title)
+
+# assign to object and customize with functions from ggplot2
+(gg1 <- posterior_vs_prior(model1_fit_hier_pClass, pars = c("beta", "varying"), prob = 0.95))
+(gg2 <- posterior_vs_prior(model2_fit_hier_title, pars = c("beta", "varying"), prob = 0.95))
+gg1 +
+ ggplot2::geom_hline(yintercept = 0, size = 0.3, linetype = 3) +
+ ggplot2::coord_flip() +
+ ggplot2::ggtitle("Comparing the prior and posterior")
+
+gg2 +
+ ggplot2::geom_hline(yintercept = 0, size = 0.3, linetype = 3) +
+ ggplot2::coord_flip() +
+ ggplot2::ggtitle("Comparing the prior and posterior")
 
 y_pred1.hier <- posterior_predict(model1_fit_hier_pClass, df1.test)
 y_pred2.hier <- posterior_predict(model2_fit_hier_title, df2.test)
@@ -325,7 +359,7 @@ ppc_dens_overlay(y.train, yrep1)
 ppc_dens_overlay(y.train, yrep2)
 
 mcmc_areas(as.matrix(model1_fit_hier_pClass)[,1:length(colnames(df1.train))])
-mcmc_areas(as.matrix(model2_fit_hier_ticket)[,1:length(colnames(df2.train))])
+mcmc_areas(as.matrix(model2_fit_hier_title)[,1:length(colnames(df2.train))])
 ```
 
 ## 5 - Posterior Predictive Checking
@@ -341,10 +375,10 @@ probs2.hier <- apply(y_pred2.hier, 2, mean)
 preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_pClass.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_pClass.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_title.csv"),
           row.names = FALSE)
 ```
