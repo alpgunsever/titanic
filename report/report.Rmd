@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "Alp Gunsever"
+author: "alpgu Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -38,7 +38,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -69,7 +69,6 @@ for (i in 1:length(dat.full$title)){
       } else{
         dat.full$title[i] <- "Miss"
       }
-        
     }
   } 
 }
@@ -94,7 +93,16 @@ dat.full$Ticket[grepl("A/5|A/5.|A.5.|A./5.|A/4.|A4.|A|A.|AQ",dat.full$Ticket) ==
 dat.full$Ticket[grepl("S",dat.full$Ticket) == TRUE] <- "S"
 dat.full$Ticket[grepl("W",dat.full$Ticket) == TRUE] <- "W"
 dat.full$Ticket <- sapply(dat.full$Ticket, function(x) ifelse(nchar(x)>1,as.character(nchar(x)),x))
+
+ for (i in 1:length(dat.full$Ticket)) {
+   if (dat.full$Ticket[i] == '3' || dat.full$Ticket[i] == '7' || dat.full$Ticket[i] == 'A' || dat.full$Ticket[i] == 'F' ||
+       dat.full$Ticket[i] == 'L' || dat.full$Ticket[i] == 'W'){
+     dat.full$Ticket[i] <- "Other"
+       }
+   
+ }
 dat.full$Ticket <- as.factor(dat.full$Ticket)
+
 
 # Create family size variable including the passenger itself
 dat.full <- transform(dat.full, 'familySize' =  SibSp + Parch +1)
@@ -215,7 +223,7 @@ test_imp <- dat.full_imp[892:1309,]
 
 The imputed dataset will be used for analysis.
 
-```{r input for rstanarm model1}
+```{r input for model1}
 y.train <- as.numeric(train_imp$Survived) # outcome
 y.train <- y.train-1
 pId.train <- train_imp$PassengerId # ID for predictions
@@ -224,17 +232,17 @@ pId.test <- test_imp$PassengerId # ID for predictions
 predictor.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 
 X <- subset(train_imp, select=predictor.variables)
-formula_train <- as.formula(y.train~ . + FareLog:AgeLog + Pclass:FareLog)
+formula_train <- as.formula(y.train~ .)
 #formula_train <- as.formula(y.train~ . + FareLog:AgeLog + Pclass:FareLog + FareLog:Ticket +
 #                              AgeLog:title + isMale:title + Embarked:Pclass)
-formula_test <- as.formula(~ . + FareLog:AgeLog + Pclass:FareLog)
+formula_test <- as.formula(~ .)
 #formula_test <- as.formula(~ . + FareLog:AgeLog + Pclass:FareLog + FareLog:Ticket + 
 #                             AgeLog:title + isMale:title + Embarked:Pclass)
 X.train <- model.matrix(formula_train, data = X,
-                        contrasts.arg = lapply(X[,1:6], contrasts, contrasts=FALSE))
+                        contrasts.arg = lapply(X[,1:5], contrasts, contrasts=FALSE))
 X <- subset(test_imp, select=predictor.variables)
 X.test <- model.matrix(formula_test, data = X,
-                        contrasts.arg = lapply(X[,1:6], contrasts, contrasts=FALSE))
+                        contrasts.arg = lapply(X[,1:5], contrasts, contrasts=FALSE))
 
 colnames(X.train) <- gsub(" ", "", colnames(X.train), fixed = TRUE)
 colnames(X.test) <- gsub(" ", "", colnames(X.test), fixed = TRUE)
@@ -245,8 +253,8 @@ N.test <- nrow(X.test)
 K.test <- ncol(X.test)
 
 for(i in 2:K.train){
-  if (colnames(X.train)[i] != 'AgeLog' & colnames(X.train)[i] != 'FareLog'){
-    X.train[,i] <- scale(X.train[,i], scale = F)  
+  if (colnames(X.train)[i] == 'AgeLog' || colnames(X.train)[i] == 'FareLog'){
+    X.train[,i] <- scale(X.train[,i])  
   }
   else{
     X.train[,i] <- (X.train[,i]-mean(X.train[,i]))/(2*sd(X.train[,i]))	    
@@ -254,8 +262,8 @@ for(i in 2:K.train){
 }
 
 for(i in 2:K.test){
-  if (colnames(X.test)[i] != 'AgeLog' & colnames(X.test)[i] != 'FareLog'){
-    X.test[,i] <- scale(X.test[,i], scale = F)  
+  if (colnames(X.test)[i] == 'AgeLog' || colnames(X.test)[i] == 'FareLog'){
+    X.test[,i] <- scale(X.test[,i])  
   }
   else{
     X.test[,i] <- (X.test[,i]-mean(X.test[,i]))/(2*sd(X.test[,i]))	    
@@ -276,18 +284,18 @@ J2 <- length(levels(train_imp$Pclass))
 We will perform a prior predictive check with only using the priors and no data.
 
 ```{r prior predictive checking}
-stanFile <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","multivariate_hier_model.stan")
+stanFile <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","multivariate_hier_model.stan")
 multi_hier_model <- stan_model(stanFile)
 
 # Prior predictive checks
-X.train_prior <- data.frame()
-colnames(X.train_prior) <- predictor.variables
-options(mc.cores = 4)
-multi_hier1_title_prior.fit <- sampling(multi_hier_model,list(Ntrain=N.train,Ntest=N.test,K = K.train,J=J1,
-                                   jjtrain=titleTrain,jjtest=titleTest,xtrain=X.train,xtest=X.test,y=y.train),
-                     iter = 2000, chains = 4, warmup = 1000,
-                     control = list(adapt_delta = 0.99, max_treedepth = 20))
-
+#X.train_prior <- data.frame()
+#colnames(X.train_prior) <- predictor.variables
+#options(mc.cores = 4)
+#multi_hier1_title_prior.fit <- sampling(multi_hier_model,list(Ntrain=N.train,Ntest=N.test,K = K.train,J=J1,
+#                                   jjtrain=titleTrain,jjtest=titleTest,xtrain=X.train,xtest=X.test,y=y.train),
+#                     iter = 2000, chains = 4, warmup = 1000,
+#                     control = list(adapt_delta = 0.99, max_treedepth = 20))
+#
 ```
 
 ## 4 - Model Fitting and Algorithm Diagnostics
@@ -297,7 +305,7 @@ options(mc.cores = 4)
 multi_hier1_title_post.fit <- sampling(multi_hier_model,list(Ntrain=N.train,Ntest=N.test,K = K.train,J=J1,
                                    jjtrain=titleTrain,jjtest=titleTest,xtrain=X.train,xtest=X.test,y=y.train),
                      iter = 2000, chains = 4, warmup = 1000,
-                     control = list(adapt_delta = 0.99, max_treedepth = 20))
+                     control = list(adapt_delta = 0.99, max_treedepth = 15))
 
 # model 2: hierarchical grouped by Pclass---------------------------------------------------------------
 
@@ -306,8 +314,6 @@ multi_hier1_title_post.fit <- sampling(multi_hier_model,list(Ntrain=N.train,Ntes
 
 ```{r model diagnostics}
 print(multi_hier1_title_post.fit, probs = c(0.25,0.5,0.75))
-
-
 
 loo1.pred.hier <- loo(multi_hier1_title_post.fit)
 
@@ -331,6 +337,6 @@ probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
           row.names = FALSE)
 ```
