@@ -224,10 +224,16 @@ pId.test <- test_imp$PassengerId # ID for predictions
 predictor.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 
 X <- subset(train_imp, select=predictor.variables)
-X.train <- model.matrix(y.train~ ., data = X,
+formula_train <- as.formula(y.train~ . + FareLog:AgeLog + Pclass:FareLog)
+#formula_train <- as.formula(y.train~ . + FareLog:AgeLog + Pclass:FareLog + FareLog:Ticket +
+#                              AgeLog:title + isMale:title + Embarked:Pclass)
+formula_test <- as.formula(~ . + FareLog:AgeLog + Pclass:FareLog)
+#formula_test <- as.formula(~ . + FareLog:AgeLog + Pclass:FareLog + FareLog:Ticket + 
+#                             AgeLog:title + isMale:title + Embarked:Pclass)
+X.train <- model.matrix(formula_train, data = X,
                         contrasts.arg = lapply(X[,1:6], contrasts, contrasts=FALSE))
 X <- subset(test_imp, select=predictor.variables)
-X.test <- model.matrix(~ ., data = X,
+X.test <- model.matrix(formula_test, data = X,
                         contrasts.arg = lapply(X[,1:6], contrasts, contrasts=FALSE))
 
 colnames(X.train) <- gsub(" ", "", colnames(X.train), fixed = TRUE)

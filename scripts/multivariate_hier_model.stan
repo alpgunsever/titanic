@@ -25,12 +25,11 @@ transformed parameters {
     tau[k] = 2.5 * tan(tau_unif[k]);
   } 
   beta = mu + (diag_pre_multiply(tau,L_Omega) * z)';
-  
   x_beta_jj = rows_dot_product(beta[jjtrain] , xtrain);
 }
 model {
   to_vector(z) ~ std_normal();
-  L_Omega ~ lkj_corr_cholesky(2);
+  L_Omega ~ lkj_corr_cholesky(0.1);
   to_vector(mu) ~ student_t(7,0,2.5);
   
   y ~ bernoulli_logit(x_beta_jj);
