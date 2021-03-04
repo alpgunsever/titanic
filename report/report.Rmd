@@ -451,14 +451,21 @@ multi_hier5_fSize_post.fit <- sampling(multi_hier_model,list(Ntrain=N5.train,Nte
 ```
 
 ```{r model diagnostics}
-#print(multi_hier1_title_post.fit, probs = c(0.25,0.5,0.75), pars = "beta")
-loo1.pred.hier <- loo(multi_hier1_title_post.fit)
-loo2.pred.hier <- loo(multi_hier2_pClass_post.fit)
-loo3.pred.hier <- loo(multi_hier3_ticket_post.fit)
-loo4.pred.hier <- loo(multi_hier4_embarked_post.fit)
-loo5.pred.hier <- loo(multi_hier5_fSize_post.fit)
+print(multi_hier1_title_post.fit, probs = c(0.25,0.5,0.75), pars = "beta")
 
-loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pred.hier)
+loo1.pred.hier <- loo::loo(multi_hier1_title_post.fit)
+loo2.pred.hier <- loo::loo(multi_hier2_pClass_post.fit)
+loo3.pred.hier <- loo::loo(multi_hier3_ticket_post.fit)
+loo4.pred.hier <- loo::loo(multi_hier4_embarked_post.fit)
+loo5.pred.hier <- loo::loo(multi_hier5_fSize_post.fit)
+
+loo1.pred.hier
+loo2.pred.hier
+loo3.pred.hier
+loo4.pred.hier
+loo5.pred.hier
+
+loo::loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pred.hier)
 
 #stan_diag(multi_hier1_title_post.fit)
 # Checking posterior draws of normalized intercepts
@@ -475,11 +482,46 @@ loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pre
 ```{r predictions model1}
 params1.hier <- extract(multi_hier1_title_post.fit)
 y_pred1.hier <- params1.hier$pred_Survival
-
 probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
+params2.hier <- extract(multi_hier2_pClass_post.fit)
+y_pred2.hier <- params2.hier$pred_Survival
+probs2.hier <- apply(y_pred2.hier, 2, mean)
+preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
+
+params3.hier <- extract(multi_hier3_ticket_post.fit)
+y_pred3.hier <- params3.hier$pred_Survival
+probs3.hier <- apply(y_pred3.hier, 2, mean)
+preds3.hier <- ifelse(probs3.hier > .5, 1, 0)
+
+params4.hier <- extract(multi_hier4_embarked_post.fit)
+y_pred4.hier <- params4.hier$pred_Survival
+probs4.hier <- apply(y_pred4.hier, 2, mean)
+preds4.hier <- ifelse(probs4.hier > .5, 1, 0)
+
+params5.hier <- extract(multi_hier5_fSize_post.fit)
+y_pred5.hier <- params5.hier$pred_Survival
+probs5.hier <- apply(y_pred5.hier, 2, mean)
+preds5.hier <- ifelse(probs5.hier > .5, 1, 0)
+
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
 write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
+          row.names = FALSE)
+
+model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
+          row.names = FALSE)
+
+model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
+          row.names = FALSE)
+
+model4_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds4.hier)
+write.csv(x = model4_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
+          row.names = FALSE)
+
+model5_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds5.hier)
+write.csv(x = model5_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
           row.names = FALSE)
 ```
