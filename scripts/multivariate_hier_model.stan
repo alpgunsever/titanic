@@ -29,7 +29,7 @@ transformed parameters {
 }
 model {
   to_vector(z) ~ std_normal();
-  L_Omega ~ lkj_corr_cholesky(0.1);
+  L_Omega ~ lkj_corr_cholesky(0.5);
   to_vector(mu) ~ student_t(7,0,2.5);
   
   y ~ bernoulli_logit(x_beta_jj);
