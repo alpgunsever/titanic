@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "Alp Gunsever"
+author: "alpgu Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -28,6 +28,7 @@ library(ggplot2)
 theme_set(bayesplot::theme_default(base_family = "sans"))
 library(dplyr)
 library(gridExtra)
+library(rstanarm)
 ```
 
 ## 2- Exploratory Data Analysis
@@ -38,7 +39,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -240,29 +241,29 @@ formula_train <- as.formula(y.train~ .)
 formula_test <- as.formula(~ .)
 
 X <- subset(train_imp, select=predictor1.variables)
-X1.train <- model.matrix(formula_train, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X1.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor1.variables)
-X1.test <- model.matrix(formula_test, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X1.test <- model.matrix(formula_test, data = X)[,-1]
 
 X <- subset(train_imp, select=predictor2.variables)
-X2.train <- model.matrix(formula_train, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X2.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor2.variables)
-X2.test <- model.matrix(formula_test, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X2.test <- model.matrix(formula_test, data = X)[,-1]
 
 X <- subset(train_imp, select=predictor3.variables)
-X3.train <- model.matrix(formula_train, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X3.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor3.variables)
-X3.test <- model.matrix(formula_test, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X3.test <- model.matrix(formula_test, data = X)[,-1]
 
 X <- subset(train_imp, select=predictor4.variables)
-X4.train <- model.matrix(formula_train, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X4.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor4.variables)
-X4.test <- model.matrix(formula_test, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X4.test <- model.matrix(formula_test, data = X)[,-1]
 
 X <- subset(train_imp, select=predictor5.variables)
-X5.train <- model.matrix(formula_train, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X5.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor5.variables)
-X5.test <- model.matrix(formula_test, data = X, contrasts.arg = lapply(X[,1:4], contrasts, contrasts=FALSE))
+X5.test <- model.matrix(formula_test, data = X)[,-1]
 
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
 colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
@@ -275,131 +276,31 @@ colnames(X4.test) <- gsub(" ", "", colnames(X4.test), fixed = TRUE)
 colnames(X5.train) <- gsub(" ", "", colnames(X5.train), fixed = TRUE)
 colnames(X5.test) <- gsub(" ", "", colnames(X5.test), fixed = TRUE)
 
-N1.train <- nrow(X1.train)
-K1.train <- ncol(X1.train)
-N1.test <- nrow(X1.test)
-K1.test <- ncol(X1.test)
-N2.train <- nrow(X2.train)
-K2.train <- ncol(X2.train)
-N2.test <- nrow(X2.test)
-K2.test <- ncol(X2.test)
-N3.train <- nrow(X3.train)
-K3.train <- ncol(X3.train)
-N3.test <- nrow(X3.test)
-K3.test <- ncol(X3.test)
-N4.train <- nrow(X4.train)
-K4.train <- ncol(X4.train)
-N4.test <- nrow(X4.test)
-K4.test <- ncol(X4.test)
-N5.train <- nrow(X5.train)
-K5.train <- ncol(X5.train)
-N5.test <- nrow(X5.test)
-K5.test <- ncol(X5.test)
-
-for(i in 2:K1.train){
-  if (colnames(X1.train)[i] == 'AgeLog' || colnames(X1.train)[i] == 'FareLog'){
-    X1.train[,i] <- scale(X1.train[,i])  
-  }
-  else{
-    X1.train[,i] <- (X1.train[,i]-mean(X1.train[,i]))/(2*sd(X1.train[,i]))	    
-  }
-}
-for(i in 2:K1.test){
-  if (colnames(X1.test)[i] == 'AgeLog' || colnames(X1.test)[i] == 'FareLog'){
-    X1.test[,i] <- scale(X1.test[,i])  
-  }
-  else{
-    X1.test[,i] <- (X1.test[,i]-mean(X1.test[,i]))/(2*sd(X1.test[,i]))	    
-  }
-}
-
-for(i in 2:K2.train){
-  if (colnames(X2.train)[i] == 'AgeLog' || colnames(X2.train)[i] == 'FareLog'){
-    X2.train[,i] <- scale(X2.train[,i])  
-  }
-  else{
-    X2.train[,i] <- (X2.train[,i]-mean(X2.train[,i]))/(2*sd(X2.train[,i]))	    
-  }
-}
-for(i in 2:K2.test){
-  if (colnames(X2.test)[i] == 'AgeLog' || colnames(X2.test)[i] == 'FareLog'){
-    X2.test[,i] <- scale(X2.test[,i])  
-  }
-  else{
-    X2.test[,i] <- (X2.test[,i]-mean(X2.test[,i]))/(2*sd(X2.test[,i]))	    
-  }
-}
-
-for(i in 2:K3.train){
-  if (colnames(X3.train)[i] == 'AgeLog' || colnames(X3.train)[i] == 'FareLog'){
-    X3.train[,i] <- scale(X3.train[,i])  
-  }
-  else{
-    X3.train[,i] <- (X3.train[,i]-mean(X3.train[,i]))/(2*sd(X3.train[,i]))	    
-  }
-}
-for(i in 2:K3.test){
-  if (colnames(X3.test)[i] == 'AgeLog' || colnames(X3.test)[i] == 'FareLog'){
-    X3.test[,i] <- scale(X3.test[,i])  
-  }
-  else{
-    X3.test[,i] <- (X3.test[,i]-mean(X3.test[,i]))/(2*sd(X3.test[,i]))	    
-  }
-}
-
-for(i in 2:K4.train){
-  if (colnames(X4.train)[i] == 'AgeLog' || colnames(X4.train)[i] == 'FareLog'){
-    X4.train[,i] <- scale(X4.train[,i])  
-  }
-  else{
-    X4.train[,i] <- (X4.train[,i]-mean(X4.train[,i]))/(2*sd(X4.train[,i]))	    
-  }
-}
-for(i in 2:K4.test){
-  if (colnames(X4.test)[i] == 'AgeLog' || colnames(X4.test)[i] == 'FareLog'){
-    X4.test[,i] <- scale(X4.test[,i])  
-  }
-  else{
-    X4.test[,i] <- (X4.test[,i]-mean(X4.test[,i]))/(2*sd(X4.test[,i]))	    
-  }
-}
-
-for(i in 2:K5.train){
-  if (colnames(X5.train)[i] == 'AgeLog' || colnames(X5.train)[i] == 'FareLog'){
-    X5.train[,i] <- scale(X5.train[,i])  
-  }
-  else{
-    X5.train[,i] <- (X5.train[,i]-mean(X5.train[,i]))/(2*sd(X5.train[,i]))	    
-  }
-}
-for(i in 2:K5.test){
-  if (colnames(X5.test)[i] == 'AgeLog' || colnames(X5.test)[i] == 'FareLog'){
-    X5.test[,i] <- scale(X5.test[,i])  
-  }
-  else{
-    X5.test[,i] <- (X5.test[,i]-mean(X5.test[,i]))/(2*sd(X5.test[,i]))	    
-  }
-}
+X1.train <- scale(X1.train) 
+X1.test <- scale(X1.test)  
+X2.train <- scale(X2.train) 
+X2.test <- scale(X2.test)  
+X3.train <- scale(X3.train) 
+X3.test <- scale(X3.test)  
+X4.train <- scale(X4.train) 
+X4.test <- scale(X4.test)  
+X5.train <- scale(X5.train) 
+X5.test <- scale(X5.test)  
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
-J1 <- length(levels(train_imp$title))
 
 pClassTrain <- as.numeric(train_imp$Pclass)
 pClassTest <- as.numeric(test_imp$Pclass)
-J2 <- length(levels(train_imp$Pclass))
 
 ticketTrain <- as.numeric(train_imp$Ticket)
 ticketTest <- as.numeric(test_imp$Ticket)
-J3 <- length(levels(train_imp$Ticket))
 
 embarkedTrain <- as.numeric(train_imp$Embarked)
 embarkedTest <- as.numeric(test_imp$Embarked)
-J4 <- length(levels(train_imp$Embarked))
 
 fsizeTrain <- as.numeric(train_imp$fSize)
 fsizeTest <- as.numeric(test_imp$fSize)
-J5 <- length(levels(train_imp$fSize))
 ```
 
 ## 3- Prior Predictive Checking
@@ -407,33 +308,56 @@ J5 <- length(levels(train_imp$fSize))
 We will perform a prior predictive check with only using the priors and no data.
 
 ```{r prior predictive checking}
-stanFile <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","scripts","multivariate_hier_model.stan")
-multi_hier_model <- stan_model(stanFile)
-
 # Prior predictive checks
-#X.train_prior <- data.frame()
-#colnames(X.train_prior) <- predictor.variables
-#options(mc.cores = 4)
-#multi_hier1_title_prior.fit <- sampling(multi_hier_model,list(Ntrain=N.train,Ntest=N.test,K = K.train,J=J1,
-#                                   jjtrain=titleTrain,jjtest=titleTest,xtrain=X.train,xtest=X.test,y=y.train),
-#                     iter = 2000, chains = 4, warmup = 1000,
-#                     control = list(adapt_delta = 0.99, max_treedepth = 20))
-#
+
 ```
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model1 fitting}
-# model 1: hierarchical grouped by title---------------------------------------------------------------
-options(mc.cores = 4)
-multi_hier1_title_post.fit <- sampling(multi_hier_model,list(Ntrain=N1.train,Ntest=N1.test,K = K1.train,J=J1,
-                                   jjtrain=titleTrain,jjtest=titleTest,xtrain=X1.train,xtest=X1.test,y=y.train),
-                     iter = 2000, chains = 4, warmup = 1000,
-                     control = list(adapt_delta = 0.99, max_treedepth = 15))
+# model 1: hierarchical grouped by title with rstanarm---------------------------------------------------------------
+title <- titleTrain
+df1.train <- as.data.frame(cbind(y.train, X1.train,title))
+title <- titleTest
+df1.test <- as.data.frame(cbind(X1.test,title))
 
-multi_hier2_pClass_post.fit <- sampling(multi_hier_model,list(Ntrain=N2.train,Ntest=N2.test,K = K2.train,J=J2,
-                                   jjtrain=pClassTrain,jjtest=pClassTest,xtrain=X2.train,xtest=X2.test,y=y.train),
-                     iter = 2000, chains = 4, warmup = 1000,
-                     control = list(adapt_delta = 0.99, max_treedepth = 15))
+pClass <- pClassTrain
+df2.train <- as.data.frame(cbind(y.train, X2.train,pClass))
+pClass <- pClassTest
+df2.test <- as.data.frame(cbind(X2.test,pClass))
+
+formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|title)"))
+
+formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(1+",paste(colnames(X2.train), collapse = "+"),"|pClass)"))
+
+multi_hier1_title_post.fit <- stan_glmer(formula = formula1,
+                              data = df1.train, 
+                              cores=4,
+                              adapt_delta = 0.99,
+                              algorithm = "sampling",
+                              family = binomial(link = "logit"),
+                              prior = student_t(7,0,2.5, autoscale = F),
+                              prior_intercept = student_t(7,0,2.5, autoscale = F),
+                              prior_covariance = decov(regularization = 0.5, autoscale = F),
+                              QR=T)
+
+multi_hier2_pClass_post.fit <- stan_glmer(formula = formula2,
+                              data = df2.train, 
+                              cores=4,
+                              adapt_delta = 0.99,
+                              algorithm = "sampling",
+                              family = binomial(link = "logit"),
+                              prior = student_t(7,0,2.5),
+                              prior_intercept = student_t(7,0,2.5),
+                              prior_covariance = decov(regularization = 0.5),
+                              QR=T)
+
+y_pred1.hier <- posterior_predict(multi_hier1_title_post.fit, df1.test)
+yrep1 <- posterior_predict(multi_hier1_title_post.fit)
+
+y_pred2.hier <- posterior_predict(multi_hier2_pClass_post.fit, df2.test)
+yrep2 <- posterior_predict(multi_hier2_pClass_post.fit)
+
+# rstan trials ------------------------------------------------------------------------------------------------------
 
 multi_hier3_ticket_post.fit <- sampling(multi_hier_model,list(Ntrain=N3.train,Ntest=N3.test,K = K3.train,J=J3,
                                    jjtrain=ticketTrain,jjtest=ticketTest,xtrain=X3.train,xtest=X3.test,y=y.train),
@@ -454,7 +378,7 @@ multi_hier5_fSize_post.fit <- sampling(multi_hier_model,list(Ntrain=N5.train,Nte
 print(multi_hier1_title_post.fit, probs = c(0.25,0.5,0.75), pars = "beta")
 
 loo1.pred.hier <- loo::loo(multi_hier1_title_post.fit)
-loo2.pred.hier <- loo::loo(multi_hier2_pClass_post.fit)
+loo2.pred.hier <- loo::loo(multi_hier2_pClass_post_fit)
 loo3.pred.hier <- loo::loo(multi_hier3_ticket_post.fit)
 loo4.pred.hier <- loo::loo(multi_hier4_embarked_post.fit)
 loo5.pred.hier <- loo::loo(multi_hier5_fSize_post.fit)
@@ -467,11 +391,12 @@ loo5.pred.hier
 
 loo::loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pred.hier)
 
-#stan_diag(multi_hier1_title_post.fit)
-# Checking posterior draws of normalized intercepts
-#stan_plot(multi_hier1_title_post.fit, pars = c("beta[1,21]","beta[2,21]","beta[3,21]","beta[4,21]","beta[5,21]","beta[6,21]") , outer_level = 0.95)
+ppc_dens_overlay(y.train, yrep1)
+ppc_dens_overlay(y.train, yrep2)
 
-#mcmc_pairs(multi_hier1_title_post.fit, pars = c("beta[1,1]","beta[2,1]","beta[3,1]","beta[4,1]","beta[5,1]","beta[6,1]"))
+mcmc_areas(as.matrix(multi_hier1_title_post_rstanarm.fit)[,1:length(colnames(df1.train))])
+mcmc_areas(as.matrix(multi_hier2_pClass_post_rstanarm.fit)[,1:length(colnames(df2.train))])
+
 ```
 
 ## 5 - Posterior Predictive Checking
@@ -506,22 +431,22 @@ probs5.hier <- apply(y_pred5.hier, 2, mean)
 preds5.hier <- ifelse(probs5.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
           row.names = FALSE)
 
 model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
-write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
           row.names = FALSE)
 
 model4_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds4.hier)
-write.csv(x = model4_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
+write.csv(x = model4_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
           row.names = FALSE)
 
 model5_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds5.hier)
-write.csv(x = model5_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
+write.csv(x = model5_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
           row.names = FALSE)
 ```
