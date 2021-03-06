@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "Alp Gunsever"
+author: "alpgu Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -39,7 +39,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -309,36 +309,17 @@ We will perform a prior predictive check with only using the priors and no data.
 
 ```{r prior predictive checking}
 # Prior predictive checks
-
-```
-
-## 4 - Model Fitting and Algorithm Diagnostics
-```{r model1 fitting}
-# model 1: hierarchical grouped by title with rstanarm---------------------------------------------------------------
 title <- titleTrain
 df1.train <- as.data.frame(cbind(y.train, X1.train,title))
-title <- titleTest
-df1.test <- as.data.frame(cbind(X1.test,title))
-
 pClass <- pClassTrain
 df2.train <- as.data.frame(cbind(y.train, X2.train,pClass))
-pClass <- pClassTest
-df2.test <- as.data.frame(cbind(X2.test,pClass))
-
 ticket <- ticketTrain
 df3.train <- as.data.frame(cbind(y.train, X3.train,ticket))
-ticket <- ticketTest
-df3.test <- as.data.frame(cbind(X3.test,ticket))
-
 embarked <- embarkedTrain
 df4.train <- as.data.frame(cbind(y.train, X4.train,embarked))
-embarked <- embarkedTest
-df4.test <- as.data.frame(cbind(X4.test,embarked))
-
 fsize <- fsizeTrain
 df5.train <- as.data.frame(cbind(y.train, X5.train, fsize))
-fsize <- fsizeTest
-df5.test <- as.data.frame(cbind(X5.test,fsize))
+
 
 formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|title)"))
 
@@ -350,6 +331,45 @@ formula4 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X4.train), 
 
 formula5 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X5.train), collapse = "+")),"+(1+",paste(colnames(X5.train), collapse = "+"),"|fsize)"))
 
+multi_hier1_title_prior.fit <- stan_glmer(formula = formula1,
+                              data = df1.train,
+                              cores=4,
+                              adapt_delta = 0.99,
+                              algorithm = "sampling",
+                              family = binomial(link = "logit"),
+                              prior = student_t(7,0,2.5, autoscale = F),
+                              prior_intercept = student_t(7,0,2.5, autoscale = F),
+                              prior_covariance = decov(regularization = 0.5),
+                              QR=F, prior_PD = T)
+
+yrep.prior1 <- posterior_predict(multi_hier1_title_prior.fit)
+pp_check(y.train, yrep.prior1, ppc_dens_overlay)
+pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "median")
+pp_check(y.train, yrep.prior1, ppc_bars)
+pp_check(y.train, yrep.prior1, ppc_bars_grouped, group = title)
+pp_check(y.train, yrep.prior1, ppc_rootogram)
+
+prop_zero <- function(y) mean(y == 0)
+sd_zero <- function(y) sd(y == 0)
+prop_zero_test1 <- pp_check(multi_hier1_title_prior.fit, plotfun = "stat", stat = "prop_zero")
+sd_zero_test1 <- pp_check(multi_hier1_title_prior.fit, plotfun = "stat", stat = "sd_zero")
+grid.arrange(prop_zero_test1, sd_zero_test1, ncol=1)
+```
+
+## 4 - Model Fitting and Algorithm Diagnostics
+```{r model1 fitting}
+title <- titleTest
+df1.test <- as.data.frame(cbind(X1.test,title))
+pClass <- pClassTest
+df2.test <- as.data.frame(cbind(X2.test,pClass))
+ticket <- ticketTest
+df3.test <- as.data.frame(cbind(X3.test,ticket))
+embarked <- embarkedTest
+df4.test <- as.data.frame(cbind(X4.test,embarked))
+fsize <- fsizeTest
+df5.test <- as.data.frame(cbind(X5.test,fsize))
+
+# model 1: hierarchical grouped by title with rstanarm---------------------------------------------------------------
 multi_hier1_title_post.fit <- stan_glmer(formula = formula1,
                               data = df1.train, 
                               cores=4,
@@ -359,7 +379,7 @@ multi_hier1_title_post.fit <- stan_glmer(formula = formula1,
                               prior = student_t(7,0,2.5, autoscale = F),
                               prior_intercept = student_t(7,0,2.5, autoscale = F),
                               prior_covariance = decov(regularization = 0.5),
-                              QR=T)
+                              QR=F)
 
 multi_hier2_pClass_post.fit <- stan_glmer(formula = formula2,
                               data = df2.train, 
@@ -370,7 +390,7 @@ multi_hier2_pClass_post.fit <- stan_glmer(formula = formula2,
                               prior = student_t(7,0,2.5),
                               prior_intercept = student_t(7,0,2.5),
                               prior_covariance = decov(regularization = 0.5),
-                              QR=T)
+                              QR=F)
 
 multi_hier3_ticket_post.fit <- stan_glmer(formula = formula3,
                               data = df3.train, 
@@ -381,7 +401,7 @@ multi_hier3_ticket_post.fit <- stan_glmer(formula = formula3,
                               prior = student_t(7,0,2.5, autoscale = F),
                               prior_intercept = student_t(7,0,2.5, autoscale = F),
                               prior_covariance = decov(regularization = 0.5),
-                              QR=T)
+                              QR=F)
 
 multi_hier4_embarked_post.fit <- stan_glmer(formula = formula4,
                               data = df4.train, 
@@ -392,7 +412,7 @@ multi_hier4_embarked_post.fit <- stan_glmer(formula = formula4,
                               prior = student_t(7,0,2.5, autoscale = F),
                               prior_intercept = student_t(7,0,2.5, autoscale = F),
                               prior_covariance = decov(regularization = 0.5),
-                              QR=T)
+                              QR=F)
 
 
 multi_hier5_fsize_post.fit <- stan_glmer(formula = formula5,
@@ -404,7 +424,7 @@ multi_hier5_fsize_post.fit <- stan_glmer(formula = formula5,
                               prior = student_t(7,0,2.5, autoscale = F),
                               prior_intercept = student_t(7,0,2.5, autoscale = F),
                               prior_covariance = decov(regularization = 0.5),
-                              QR=T)
+                              QR=F)
 
 y_pred1.hier <- posterior_predict(multi_hier1_title_post.fit, df1.test)
 yrep1 <- posterior_predict(multi_hier1_title_post.fit)
@@ -523,22 +543,22 @@ probs5.hier <- apply(y_pred5.hier, 2, mean)
 preds5.hier <- ifelse(probs5.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
           row.names = FALSE)
 
 model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
-write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
           row.names = FALSE)
 
 model4_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds4.hier)
-write.csv(x = model4_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
+write.csv(x = model4_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
           row.names = FALSE)
 
 model5_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds5.hier)
-write.csv(x = model5_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
+write.csv(x = model5_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
           row.names = FALSE)
 ```
