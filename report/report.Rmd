@@ -1,6 +1,6 @@
 ---
 title: "titanic_report"
-author: "alpgu Gunsever"
+author: "Alp Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
@@ -29,6 +29,7 @@ theme_set(bayesplot::theme_default(base_family = "sans"))
 library(dplyr)
 library(gridExtra)
 library(rstanarm)
+library(brms)
 ```
 
 ## 2- Exploratory Data Analysis
@@ -39,7 +40,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -344,7 +345,7 @@ multi_hier1_title_prior.fit <- stan_glmer(formula = formula1,
 
 yrep.prior1 <- posterior_predict(multi_hier1_title_prior.fit)
 pp_check(y.train, yrep.prior1, ppc_dens_overlay)
-pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "median")
+pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "mean")
 pp_check(y.train, yrep.prior1, ppc_bars)
 pp_check(y.train, yrep.prior1, ppc_bars_grouped, group = title)
 pp_check(y.train, yrep.prior1, ppc_rootogram)
@@ -543,22 +544,22 @@ probs5.hier <- apply(y_pred5.hier, 2, mean)
 preds5.hier <- ifelse(probs5.hier > .5, 1, 0)
 
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
           row.names = FALSE)
 
 model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
+write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
           row.names = FALSE)
 
 model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
-write.csv(x = model3_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
+write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
           row.names = FALSE)
 
 model4_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds4.hier)
-write.csv(x = model4_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
+write.csv(x = model4_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
           row.names = FALSE)
 
 model5_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds5.hier)
-write.csv(x = model5_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
+write.csv(x = model5_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
           row.names = FALSE)
 ```
