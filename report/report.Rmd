@@ -370,6 +370,20 @@ df4.test <- as.data.frame(cbind(X4.test,embarked))
 fsize <- fsizeTest
 df5.test <- as.data.frame(cbind(X5.test,fsize))
 
+# brms package trial
+formula1_brms <- as.formula(paste("y.train ~", paste0("1","+(1+",paste(colnames(X1.train), collapse = "+"),"|title)")))
+
+prior1 <- prior(student_t(0,7,2.5), class = b) +
+  prior(student_t(0,7,2.5), class = sd) +
+  prior(lkj(0.5), class = cor)
+
+multi_hier1_title_post.fit_brms <- brms::brm(formula = formula1,
+                                             data = df1.train, 
+                                            family = binomial(link="logit"),
+                                            iter = 2000,
+                                            warmup = floor(iter/2),
+                                            cores = parallel::detectCores())
+
 # model 1: hierarchical grouped by title with rstanarm---------------------------------------------------------------
 multi_hier1_title_post.fit <- stan_glmer(formula = formula1,
                               data = df1.train, 
