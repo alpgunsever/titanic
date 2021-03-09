@@ -277,16 +277,16 @@ colnames(X4.test) <- gsub(" ", "", colnames(X4.test), fixed = TRUE)
 colnames(X5.train) <- gsub(" ", "", colnames(X5.train), fixed = TRUE)
 colnames(X5.test) <- gsub(" ", "", colnames(X5.test), fixed = TRUE)
 
-X1.train <- scale(X1.train) 
-X1.test <- scale(X1.test)  
-X2.train <- scale(X2.train) 
-X2.test <- scale(X2.test)  
-X3.train <- scale(X3.train) 
-X3.test <- scale(X3.test)  
-X4.train <- scale(X4.train) 
-X4.test <- scale(X4.test)  
-X5.train <- scale(X5.train) 
-X5.test <- scale(X5.test)  
+X1.train <- scale(X1.train)
+X1.test <- scale(X1.test)
+X2.train <- scale(X2.train)
+X2.test <- scale(X2.test)
+X3.train <- scale(X3.train)
+X3.test <- scale(X3.test)
+X4.train <- scale(X4.train)
+X4.test <- scale(X4.test)
+X5.train <- scale(X5.train)
+X5.test <- scale(X5.test)
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
@@ -322,15 +322,15 @@ fsize <- fsizeTrain
 df5.train <- as.data.frame(cbind(y.train, X5.train, fsize))
 
 
-formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(1+",paste(colnames(X1.train), collapse = "+"),"|title)"))
+formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(",paste(colnames(X1.train), collapse = "+"),"|title)"))
 
-formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(1+",paste(colnames(X2.train), collapse = "+"),"|pClass)"))
+formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(",paste(colnames(X2.train), collapse = "+"),"|pClass)"))
 
-formula3 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X3.train), collapse = "+")),"+(1+",paste(colnames(X3.train), collapse = "+"),"|ticket)"))
+formula3 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X3.train), collapse = "+")),"+(",paste(colnames(X3.train), collapse = "+"),"|ticket)"))
 
-formula4 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X4.train), collapse = "+")),"+(1+",paste(colnames(X4.train), collapse = "+"),"|embarked)"))
+formula4 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X4.train), collapse = "+")),"+(",paste(colnames(X4.train), collapse = "+"),"|embarked)"))
 
-formula5 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X5.train), collapse = "+")),"+(1+",paste(colnames(X5.train), collapse = "+"),"|fsize)"))
+formula5 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X5.train), collapse = "+")),"+(",paste(colnames(X5.train), collapse = "+"),"|fsize)"))
 
 multi_hier1_title_prior.fit <- stan_glmer(formula = formula1,
                               data = df1.train,
@@ -371,18 +371,24 @@ fsize <- fsizeTest
 df5.test <- as.data.frame(cbind(X5.test,fsize))
 
 # brms package trial
-formula1_brms <- as.formula(paste("y.train ~", paste0("1","+(1+",paste(colnames(X1.train), collapse = "+"),"|title)")))
+formula1_brms <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(0+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
 
-prior1 <- prior(student_t(0,7,2.5), class = b) +
-  prior(student_t(0,7,2.5), class = sd) +
-  prior(lkj(0.5), class = cor)
+formula1_brms <- bf(formula = formula1_brms, center = F)
 
-multi_hier1_title_post.fit_brms <- brms::brm(formula = formula1,
-                                             data = df1.train, 
-                                            family = binomial(link="logit"),
-                                            iter = 2000,
-                                            warmup = floor(iter/2),
-                                            cores = parallel::detectCores())
+prior1 <- prior(student_t(3,0,2.5), class = b) +
+    prior(lkj(0.5), class = cor)
+
+multi_hier1_title_post.fit_brms <- brm(formula = formula1_brms,
+                                       data = df1.train,
+                                       prior = prior1,
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15))
+
+stancode(multi_hier1_title_post.fit_brms)
+prior_summary(multi_hier1_title_post.fit_brms)
+summary(multi_hier1_title_post.fit_brms)
+conditional_effects(multi_hier1_title_post.fit_brms)
 
 # model 1: hierarchical grouped by title with rstanarm---------------------------------------------------------------
 multi_hier1_title_post.fit <- stan_glmer(formula = formula1,
