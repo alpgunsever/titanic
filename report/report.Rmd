@@ -40,7 +40,7 @@ The existing observations for different predictors will be formatted into data s
 
 ```{r clean data}
 # read train and test data
-dir <- file.path("C:","Users","Alp","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
 dat.test <- read.csv(file.path(dir,"test.csv"))
 
@@ -312,191 +312,88 @@ We will perform a prior predictive check with only using the priors and no data.
 # Prior predictive checks
 title <- titleTrain
 df1.train <- as.data.frame(cbind(y.train, X1.train,title))
-pClass <- pClassTrain
-df2.train <- as.data.frame(cbind(y.train, X2.train,pClass))
-ticket <- ticketTrain
-df3.train <- as.data.frame(cbind(y.train, X3.train,ticket))
-embarked <- embarkedTrain
-df4.train <- as.data.frame(cbind(y.train, X4.train,embarked))
-fsize <- fsizeTrain
-df5.train <- as.data.frame(cbind(y.train, X5.train, fsize))
 
+formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(0+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
 
-formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X1.train), collapse = "+")),"+(",paste(colnames(X1.train), collapse = "+"),"|title)"))
+formula1 <- bf(formula = formula1, center = F)
 
-formula2 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X2.train), collapse = "+")),"+(",paste(colnames(X2.train), collapse = "+"),"|pClass)"))
+prior1 <- prior(student_t(3,0,2.5), class = b) +
+    prior(lkj(2), class = cor)
 
-formula3 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X3.train), collapse = "+")),"+(",paste(colnames(X3.train), collapse = "+"),"|ticket)"))
-
-formula4 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X4.train), collapse = "+")),"+(",paste(colnames(X4.train), collapse = "+"),"|embarked)"))
-
-formula5 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(X5.train), collapse = "+")),"+(",paste(colnames(X5.train), collapse = "+"),"|fsize)"))
-
-multi_hier1_title_prior.fit <- stan_glmer(formula = formula1,
-                              data = df1.train,
-                              cores=4,
-                              adapt_delta = 0.99,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5, autoscale = F),
-                              prior_intercept = student_t(7,0,2.5, autoscale = F),
-                              prior_covariance = decov(regularization = 0.5),
-                              QR=F, prior_PD = T)
+multi_hier1_title_prior.fit <- brm(formula = formula1,
+                                       data = df1.train,
+                                       prior = prior1,
+                                       sample_prior = "only",
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15))
 
 yrep.prior1 <- posterior_predict(multi_hier1_title_prior.fit)
+
 pp_check(y.train, yrep.prior1, ppc_dens_overlay)
 pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "mean")
 pp_check(y.train, yrep.prior1, ppc_bars)
 pp_check(y.train, yrep.prior1, ppc_bars_grouped, group = title)
 pp_check(y.train, yrep.prior1, ppc_rootogram)
-
-prop_zero <- function(y) mean(y == 0)
-sd_zero <- function(y) sd(y == 0)
-prop_zero_test1 <- pp_check(multi_hier1_title_prior.fit, plotfun = "stat", stat = "prop_zero")
-sd_zero_test1 <- pp_check(multi_hier1_title_prior.fit, plotfun = "stat", stat = "sd_zero")
-grid.arrange(prop_zero_test1, sd_zero_test1, ncol=1)
+pp_check(multi_hier1_title_prior.fit_brms, type = "stat_2d")
+pp_check(multi_hier1_title_prior.fit_brms, type = "violin_grouped", group = "title")
 ```
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model1 fitting}
 title <- titleTest
 df1.test <- as.data.frame(cbind(X1.test,title))
-pClass <- pClassTest
-df2.test <- as.data.frame(cbind(X2.test,pClass))
-ticket <- ticketTest
-df3.test <- as.data.frame(cbind(X3.test,ticket))
-embarked <- embarkedTest
-df4.test <- as.data.frame(cbind(X4.test,embarked))
-fsize <- fsizeTest
-df5.test <- as.data.frame(cbind(X5.test,fsize))
 
-# brms package trial
-formula1_brms <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(0+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
-
-formula1_brms <- bf(formula = formula1_brms, center = F)
-
-prior1 <- prior(student_t(3,0,2.5), class = b) +
-    prior(lkj(0.5), class = cor)
-
-multi_hier1_title_post.fit_brms <- brm(formula = formula1_brms,
+# model 1: hierarchical grouped by title with brms---------------------------------------------------------------
+multi_hier1_title_post.fit <- brm(formula = formula1_brms,
                                        data = df1.train,
                                        prior = prior1,
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15))
 
-stancode(multi_hier1_title_post.fit_brms)
-prior_summary(multi_hier1_title_post.fit_brms)
-summary(multi_hier1_title_post.fit_brms)
-conditional_effects(multi_hier1_title_post.fit_brms)
 
-# model 1: hierarchical grouped by title with rstanarm---------------------------------------------------------------
-multi_hier1_title_post.fit <- stan_glmer(formula = formula1,
-                              data = df1.train, 
-                              cores=4,
-                              adapt_delta = 0.99,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5, autoscale = F),
-                              prior_intercept = student_t(7,0,2.5, autoscale = F),
-                              prior_covariance = decov(regularization = 0.5),
-                              QR=F)
-
-multi_hier2_pClass_post.fit <- stan_glmer(formula = formula2,
-                              data = df2.train, 
-                              cores=4,
-                              adapt_delta = 0.99,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5),
-                              prior_intercept = student_t(7,0,2.5),
-                              prior_covariance = decov(regularization = 0.5),
-                              QR=F)
-
-multi_hier3_ticket_post.fit <- stan_glmer(formula = formula3,
-                              data = df3.train, 
-                              cores=4,
-                              adapt_delta = 0.99,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5, autoscale = F),
-                              prior_intercept = student_t(7,0,2.5, autoscale = F),
-                              prior_covariance = decov(regularization = 0.5),
-                              QR=F)
-
-multi_hier4_embarked_post.fit <- stan_glmer(formula = formula4,
-                              data = df4.train, 
-                              cores=4,
-                              adapt_delta = 0.99,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5, autoscale = F),
-                              prior_intercept = student_t(7,0,2.5, autoscale = F),
-                              prior_covariance = decov(regularization = 0.5),
-                              QR=F)
-
-
-multi_hier5_fsize_post.fit <- stan_glmer(formula = formula5,
-                              data = df5.train, 
-                              cores=4,
-                              adapt_delta = 0.99,
-                              algorithm = "sampling",
-                              family = binomial(link = "logit"),
-                              prior = student_t(7,0,2.5, autoscale = F),
-                              prior_intercept = student_t(7,0,2.5, autoscale = F),
-                              prior_covariance = decov(regularization = 0.5),
-                              QR=F)
-
-y_pred1.hier <- posterior_predict(multi_hier1_title_post.fit, df1.test)
-yrep1 <- posterior_predict(multi_hier1_title_post.fit)
-
-y_pred2.hier <- posterior_predict(multi_hier2_pClass_post.fit, df2.test)
-yrep2 <- posterior_predict(multi_hier2_pClass_post.fit)
-
-y_pred3.hier <- posterior_predict(multi_hier3_ticket_post.fit, df3.test)
-yrep3 <- posterior_predict(multi_hier3_ticket_post.fit)
-
-y_pred4.hier <- posterior_predict(multi_hier4_embarked_post.fit, df4.test)
-yrep4 <- posterior_predict(multi_hier4_embarked_post.fit)
-
-y_pred5.hier <- posterior_predict(multi_hier5_fsize_post.fit, df5.test)
-yrep5 <- posterior_predict(multi_hier5_fsize_post.fit)
 ```
 
-```{r model diagnostics}
+
+```{r simulating posterior predictions}
+# making predictions
+y_pred1.hier <- posterior_predict(multi_hier1_title_post.fit, df1.test)
+yrep.posterior1 <- posterior_predict(multi_hier1_title_post.fit)
+```
+
+## 5 - Posterior Predictive Checking
+```{r posterior predictive checking}
+summary(multi_hier1_title_post.fit)
+plot(conditional_effects(multi_hier1_title_post.fit), ask = F)
+
 round(posterior_interval(multi_hier1_title_post.fit, prob = 0.9), 2)
 
+pp_check(y.train, yrep1, ppc_dens_overlay)
+pp_check(y.train, yrep1, fun = "stat_grouped", group = title, stat = "mean")
+pp_check(y.train, yrep1, ppc_bars)
+pp_check(y.train, yrep1, ppc_bars_grouped, group = title)
+pp_check(y.train, yrep1, ppc_rootogram)
+pp_check(multi_hier1_title_post.fit_brms, type = "stat_2d")
+pp_check(multi_hier1_title_post.fit_brms, type = "violin_grouped", group = "title")
+pp_check(multi_hier1_title_post.fit_brms, type='error_scatter_avg')
+
+mcmc_intervals(multi_hier1_title_post.fit_brms, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
+
+mcmc_areas(multi_hier1_title_post.fit_brms, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
+
+mcmc_hist(multi_hier1_title_post.fit_brms, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
+```
+
+## 6 - Model Comparison
+```{r model comparison}
 loo1.pred.hier <- loo::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4)
-loo2.pred.hier <- loo::loo(multi_hier2_pClass_post.fit, save_psis = TRUE, cores = 4)
-loo3.pred.hier <- loo::loo(multi_hier3_ticket_post.fit, save_psis = TRUE, cores = 4)
-loo4.pred.hier <- loo::loo(multi_hier4_embarked_post.fit, save_psis = TRUE, cores = 4)
-loo5.pred.hier <- loo::loo(multi_hier5_fsize_post.fit, save_psis = TRUE, cores = 4)
 
 print(loo1.pred.hier)
-loo2.pred.hier
-loo3.pred.hier
-loo4.pred.hier
-loo5.pred.hier
 
 plot(loo1.pred.hier, label_points = TRUE)
-plot(loo2.pred.hier, label_points = TRUE)
-plot(loo3.pred.hier, label_points = TRUE)
-plot(loo4.pred.hier, label_points = TRUE)
-plot(loo5.pred.hier, label_points = TRUE)
 
-loo::loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pred.hier)
-
-ppc_dens_overlay(y.train, yrep1)
-ppc_dens_overlay(y.train, yrep2)
-ppc_dens_overlay(y.train, yrep3)
-ppc_dens_overlay(y.train, yrep4)
-ppc_dens_overlay(y.train, yrep5)
-
-mcmc_areas(as.matrix(multi_hier1_title_post.fit)[,1:length(colnames(df1.train))])
-mcmc_areas(as.matrix(multi_hier2_pClass_post.fit)[,1:length(colnames(df2.train))])
-mcmc_areas(as.matrix(multi_hier3_ticket_post.fit)[,1:length(colnames(df3.train))])
-mcmc_areas(as.matrix(multi_hier4_embarked_post.fit)[,1:length(colnames(df4.train))])
-mcmc_areas(as.matrix(multi_hier5_fsize_post.fit)[,1:length(colnames(df5.train))])
+#loo::loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pred.hier)
 
 # Marginal Posterior Predictive Checks
 ppc_loo_pit_overlay(
@@ -504,82 +401,14 @@ ppc_loo_pit_overlay(
   yrep = yrep1,
   lw = weights(loo1.pred.hier$psis_object)
 )
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep2,
-  lw = weights(loo2.pred.hier$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep3,
-  lw = weights(loo3.pred.hier$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep4,
-  lw = weights(loo4.pred.hier$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep5,
-  lw = weights(loo5.pred.hier$psis_object)
-)
-
-# Posterior Predictive Checks
-prop_zero <- function(y) mean(y == 0)
-sd_zero <- function(y) sd(y == 0)
-(prop_zero_test1 <- pp_check(multi_hier1_title_post.fit, plotfun = "stat", stat = "prop_zero"))
-(sd_zero_test1 <- pp_check(multi_hier1_title_post.fit, plotfun = "stat", stat = "sd_zero"))
-grid.arrange(prop_zero_test1, sd_zero_test1, ncol=2)
-
-(prop_zero_test2 <- pp_check(multi_hier2_pClass_post.fit, plotfun = "stat", stat = "prop_zero"))
-(prop_zero_test3 <- pp_check(multi_hier3_ticket_post.fit, plotfun = "stat", stat = "prop_zero"))
-(prop_zero_test4 <- pp_check(multi_hier4_embarked_post.fit, plotfun = "stat", stat = "prop_zero"))
-(prop_zero_test5 <- pp_check(multi_hier5_fsize_post.fit, plotfun = "stat", stat = "prop_zero"))
 ```
-
-## 5 - Posterior Predictive Checking
-
-## 6 - Model Comparison
 
 ## 7 - Prediction Submission
 ```{r predictions model1}
 probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
 
-probs2.hier <- apply(y_pred2.hier, 2, mean)
-preds2.hier <- ifelse(probs2.hier > .5, 1, 0)
-
-probs3.hier <- apply(y_pred3.hier, 2, mean)
-preds3.hier <- ifelse(probs3.hier > .5, 1, 0)
-
-probs4.hier <- apply(y_pred4.hier, 2, mean)
-preds4.hier <- ifelse(probs4.hier > .5, 1, 0)
-
-probs5.hier <- apply(y_pred5.hier, 2, mean)
-preds5.hier <- ifelse(probs5.hier > .5, 1, 0)
-
 model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
-          row.names = FALSE)
-
-model2_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds2.hier)
-write.csv(x = model2_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model2_hier_pClass.csv"),
-          row.names = FALSE)
-
-model3_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds3.hier)
-write.csv(x = model3_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3_hier_ticket.csv"),
-          row.names = FALSE)
-
-model4_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds4.hier)
-write.csv(x = model4_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model4_hier_embarked.csv"),
-          row.names = FALSE)
-
-model5_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds5.hier)
-write.csv(x = model5_hier.submission, file = file.path("C:","Users","Alp","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5_hier_fsize.csv"),
+write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
           row.names = FALSE)
 ```
