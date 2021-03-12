@@ -306,20 +306,26 @@ fsizeTest <- as.numeric(test_imp$fSize)
 
 ## 3- Prior Predictive Checking
 
-We will perform a prior predictive check with only using the priors and no data.
+We will perform a prior predictive check with only using the priors and no data.The reason for making prior predictive analysis is to make a sanity check on the priors without using the likelihood. 
 
 ```{r prior predictive checking}
 # Prior predictive checks
 title <- titleTrain
 df1.train <- as.data.frame(cbind(y.train, X1.train,title))
 
-formula1 <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
+formula_only_intercept_population <- as.formula(y.train ~ 1)
+formula_only_intercept_population <- bf(formula = formula_only_intercept_population, center = F)
 
-formula1 <- bf(formula = formula1, center = F)
+formula_only_intercept_population_and_group <- as.formula(y.train ~ 1 + (1|title))
+formula_only_intercept_population_and_group <- bf(formula = formula_only_intercept_population_and_group, center = F)
 
-prior1 <- prior(student_t(7,0,2.5), class = b) + prior(lkj(2), class = cor)
+formula_hier1_title <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
+formula_hier1_title <- bf(formula = formula_hier1_title, center = F)
 
-multi_hier1_title_prior.fit <- brm(formula = formula1,
+prior0 <- prior(student_t(3,0,2.5), class = b)
+prior1 <- prior(student_t(3,0,2.5), class = b) + prior(lkj(2), class = cor)
+
+multi_hier1_title_prior.fit <- brm(formula = formula_hier1_title,
                                        data = df1.train,
                                        prior = prior1,
                                        sample_prior = "only",
@@ -334,17 +340,36 @@ pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "mean
 pp_check(y.train, yrep.prior1, ppc_bars)
 pp_check(y.train, yrep.prior1, ppc_bars_grouped, group = title)
 pp_check(y.train, yrep.prior1, ppc_rootogram)
-pp_check(multi_hier1_title_prior.fit_brms, type = "stat_2d")
-pp_check(multi_hier1_title_prior.fit_brms, type = "violin_grouped", group = "title")
+pp_check(multi_hier1_title_prior.fit, type = "stat_2d")
+pp_check(multi_hier1_title_prior.fit, type = "violin_grouped", group = "title")
 ```
 
+We have used weakly informative robust prior of student_t(3,0,2.5) for both population-level and group-level parameters. We also used lkj(2) for the correlation matrix. It can be seen that the spread for prior predictive samples have much higher variance than the actual response variable for the training set. It confirms that the chosen prior can be used for posterior predictive check along with the likelihood.
+
 ## 4 - Model Fitting and Algorithm Diagnostics
-```{r model1 fitting}
+```{r model fitting}
 title <- titleTest
 df1.test <- as.data.frame(cbind(X1.test,title))
 
-# model 1: hierarchical grouped by title with brms---------------------------------------------------------------
-multi_hier1_title_post.fit <- brm(formula = formula1,
+# model 1: Only intercept model at population level----------------------------------------------------
+only_population_intercept.fit <- brm(formula = formula_only_intercept_population,
+                                      data = df1.train,
+                                      prior = prior0,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15))
+
+# model 2: Only intercept model at population level and grouping level by title------------------------
+population_and_group_intercept.fit <- brm(formula = formula_only_intercept_population_and_group,
+                                      data = df1.train,
+                                      prior = prior0,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15))
+
+
+# model 3: All predictors model with population and group effects by title----------------------------
+multi_hier1_title_post.fit <- brm(formula = formula_hier1_title,
                                        data = df1.train,
                                        prior = prior1,
                                        family = bernoulli(link="logit"),
@@ -357,13 +382,21 @@ multi_hier1_title_post.fit <- brm(formula = formula1,
 
 ```{r simulating posterior predictions}
 # making predictions
-y_pred1.hier <- posterior_predict(multi_hier1_title_post.fit, df1.test)
-yrep.posterior1 <- posterior_predict(multi_hier1_title_post.fit)
+y_pred1 <- posterior_predict(only_population_intercept.fit, df1.test)
+y_pred2 <- posterior_predict(population_and_group_intercept.fit, df1.test)
+y_pred3 <- posterior_predict(multi_hier1_title_post.fit, df1.test)
+
+yrep1.posterior <- posterior_predict(only_population_intercept.fit)
+yrep2.posterior <- posterior_predict(population_and_group_intercept.fit)
+yrep3.posterior <- posterior_predict(multi_hier1_title_post.fit)
 ```
 
 ## 5 - Posterior Predictive Checking
 ```{r posterior predictive checking}
+summary(only_population_intercept.fit)
+summary(population_and_group_intercept.fit)
 summary(multi_hier1_title_post.fit)
+
 plot(conditional_effects(multi_hier1_title_post.fit), ask = F)
 
 round(posterior_interval(multi_hier1_title_post.fit, prob = 0.9), 2)
@@ -386,19 +419,37 @@ mcmc_hist(multi_hier1_title_post.fit_brms, pars = c("b_Intercept",paste0("b_",co
 
 ## 6 - Model Comparison
 ```{r model comparison}
-loo1.pred.hier <- loo::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4)
+loo1 <- loo::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4)
+loo2 <- loo::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4)
+loo3 <- loo::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4)
 
-print(loo1.pred.hier)
+print(loo1)
+print(loo2)
+print(loo3)
 
-plot(loo1.pred.hier, label_points = TRUE)
+plot(loo1, label_points = TRUE)
+plot(loo2, label_points = TRUE)
+plot(loo3, label_points = TRUE)
 
-#loo::loo_compare(loo1.pred.hier,loo2.pred.hier,loo3.pred.hier,loo4.pred.hier,loo5.pred.hier)
+loo::loo_compare(loo1,loo2,loo3)
 
 # Marginal Posterior Predictive Checks
 ppc_loo_pit_overlay(
   y = y.train,
-  yrep = yrep1,
-  lw = weights(loo1.pred.hier$psis_object)
+  yrep = yrep1.posterior,
+  lw = weights(loo1$psis_object)
+)
+
+ppc_loo_pit_overlay(
+  y = y.train,
+  yrep = yrep2.posterior,
+  lw = weights(loo2$psis_object)
+)
+
+ppc_loo_pit_overlay(
+  y = y.train,
+  yrep = yrep3.posterior,
+  lw = weights(loo3$psis_object)
 )
 ```
 
