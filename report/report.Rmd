@@ -28,7 +28,6 @@ library(ggplot2)
 theme_set(bayesplot::theme_default(base_family = "sans"))
 library(dplyr)
 library(gridExtra)
-library(rstanarm)
 library(brms)
 ```
 
@@ -319,6 +318,9 @@ formula_only_intercept_population <- bf(formula = formula_only_intercept_populat
 formula_only_intercept_population_and_group <- as.formula(y.train ~ 1 + (1|title))
 formula_only_intercept_population_and_group <- bf(formula = formula_only_intercept_population_and_group, center = F)
 
+formula_all_population <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"))))
+formula_all_population <- bf(formula = formula_all_population, center = F)
+
 formula_hier1_title <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
 formula_hier1_title <- bf(formula = formula_hier1_title, center = F)
 
@@ -367,8 +369,16 @@ population_and_group_intercept.fit <- brm(formula = formula_only_intercept_popul
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15))
 
+# model 3: All predictors model with population effects only------------------------------------------
+population_all.fit <- brm(formula = formula_all_population,
+                                      data = df1.train,
+                                      prior = prior0,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15))
 
-# model 3: All predictors model with population and group effects by title----------------------------
+
+# model 4: All predictors model with population and group effects by title----------------------------
 multi_hier1_title_post.fit <- brm(formula = formula_hier1_title,
                                        data = df1.train,
                                        prior = prior1,
@@ -384,24 +394,31 @@ multi_hier1_title_post.fit <- brm(formula = formula_hier1_title,
 # making predictions
 y_pred1 <- posterior_predict(only_population_intercept.fit, df1.test)
 y_pred2 <- posterior_predict(population_and_group_intercept.fit, df1.test)
-y_pred3 <- posterior_predict(multi_hier1_title_post.fit, df1.test)
+y_pred3 <- posterior_predict(population_all.fit, df1.test)
+y_pred4 <- posterior_predict(multi_hier1_title_post.fit, df1.test)
 
 yrep1.posterior <- posterior_predict(only_population_intercept.fit)
 yrep2.posterior <- posterior_predict(population_and_group_intercept.fit)
-yrep3.posterior <- posterior_predict(multi_hier1_title_post.fit)
+yrep3.posterior <- posterior_predict(population_all.fit)
+yrep4.posterior <- posterior_predict(multi_hier1_title_post.fit)
 ```
 
 ## 5 - Posterior Predictive Checking
 ```{r posterior predictive checking}
 summary(only_population_intercept.fit)
 summary(population_and_group_intercept.fit)
+summary(population_all.fit)
 summary(multi_hier1_title_post.fit)
 
 plot(conditional_effects(multi_hier1_title_post.fit), ask = F)
 
 round(posterior_interval(multi_hier1_title_post.fit, prob = 0.9), 2)
 
-pp_check(y.train, yrep.posterior1, ppc_dens_overlay)
+pp_check(y.train, yrep1.posterior, ppc_dens_overlay)
+pp_check(y.train, yrep2.posterior, ppc_dens_overlay)
+pp_check(y.train, yrep3.posterior, ppc_dens_overlay)
+pp_check(y.train, yrep4.posterior, ppc_dens_overlay)
+
 pp_check(y.train, yrep.posterior1, fun = "stat_grouped", group = title, stat = "mean")
 pp_check(y.train, yrep.posterior1, ppc_bars)
 pp_check(y.train, yrep.posterior1, ppc_bars_grouped, group = title)
@@ -421,17 +438,20 @@ mcmc_hist(multi_hier1_title_post.fit_brms, pars = c("b_Intercept",paste0("b_",co
 ```{r model comparison}
 loo1 <- loo::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4)
 loo2 <- loo::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4)
-loo3 <- loo::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4)
+loo3 <- loo::loo(population_all.fit, save_psis = TRUE, cores = 4)
+loo4 <- loo::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4)
 
 print(loo1)
 print(loo2)
 print(loo3)
+print(loo4)
 
 plot(loo1, label_points = TRUE)
 plot(loo2, label_points = TRUE)
 plot(loo3, label_points = TRUE)
+plot(loo4, label_points = TRUE)
 
-loo::loo_compare(loo1,loo2,loo3)
+loo::loo_compare(loo1,loo2,loo3,loo4)
 
 # Marginal Posterior Predictive Checks
 ppc_loo_pit_overlay(
@@ -450,6 +470,12 @@ ppc_loo_pit_overlay(
   y = y.train,
   yrep = yrep3.posterior,
   lw = weights(loo3$psis_object)
+)
+
+ppc_loo_pit_overlay(
+  y = y.train,
+  yrep = yrep4.posterior,
+  lw = weights(loo4$psis_object)
 )
 ```
 
