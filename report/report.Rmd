@@ -100,7 +100,6 @@ dat.full$Ticket <- sapply(dat.full$Ticket, function(x) ifelse(nchar(x)>1,as.char
  }
 dat.full$Ticket <- as.factor(dat.full$Ticket)
 
-
 # Create family size variable including the passenger itself
 dat.full <- transform(dat.full, 'familySize' =  SibSp + Parch +1)
 dat.full <- dat.full[ , -which(names(dat.full) %in% c("SibSp","Parch"))]
@@ -302,7 +301,7 @@ multi_hier1_title_prior.fit <- brm(formula = formula_hier1_title,
 
 yrep.prior1 <- posterior_predict(multi_hier1_title_prior.fit)
 
-pp_check(y.train, yrep.prior1, ppc_dens_overlay)
+pp_check(y.train, yrep.prior1, ppc_dens_overlay, nsamples = 100)
 pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "mean")
 pp_check(y.train, yrep.prior1, ppc_bars)
 pp_check(y.train, yrep.prior1, ppc_bars_grouped, group = title)
@@ -328,7 +327,8 @@ only_population_intercept.fit <- brm(formula = formula_only_intercept_population
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
-                                      save_pars = save_pars(all = TRUE))
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 
 # model 2: All predictors model with population effects only------------------------------------------
 population_all.fit <- brm(formula = formula_all_population,
@@ -337,7 +337,8 @@ population_all.fit <- brm(formula = formula_all_population,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
-                                      save_pars = save_pars(all = TRUE))
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 
 # model 3: All predictors model with population effects only and horseshoe prior----------------------
 population_all_hs.fit <- brm(formula = formula_all_population,
@@ -346,7 +347,8 @@ population_all_hs.fit <- brm(formula = formula_all_population,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
-                                      save_pars = save_pars(all = TRUE))
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 
 # model 4: Only intercept model at population level and grouping level by title------------------------
 population_and_group_intercept.fit <- brm(formula = formula_only_intercept_population_and_group,
@@ -355,7 +357,8 @@ population_and_group_intercept.fit <- brm(formula = formula_only_intercept_popul
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
-                                      save_pars = save_pars(all = TRUE))
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 
 # model 5: All predictors model with population and group effects by title----------------------------
 multi_hier1_title_post.fit <- brm(formula = formula_hier1_title,
@@ -364,7 +367,8 @@ multi_hier1_title_post.fit <- brm(formula = formula_hier1_title,
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15),
-                                       save_pars = save_pars(all = TRUE))
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
 
 # model 6: All predictors model with population and group effects by pClass----------------------------
 multi_hier2_pClass_post.fit <- brm(formula = formula_hier2_pClass,
@@ -373,9 +377,8 @@ multi_hier2_pClass_post.fit <- brm(formula = formula_hier2_pClass,
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15),
-                                       save_pars = save_pars(all = TRUE))
-
-
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
 ```
 
 
@@ -405,22 +408,21 @@ summary(population_and_group_intercept.fit)
 summary(multi_hier1_title_post.fit)
 summary(multi_hier2_pClass_post.fit)
 
+plot(conditional_effects(population_all.fit), ask = F)
 plot(conditional_effects(multi_hier1_title_post.fit), ask = F)
 
-round(posterior_interval(multi_hier1_title_post.fit, prob = 0.9), 2)
+pp_check(y.train, yrep1.posterior, ppc_dens_overlay, nsamples = 50)
+pp_check(y.train, yrep2.posterior, ppc_dens_overlay, nsamples = 50)
+pp_check(y.train, yrep3.posterior, ppc_dens_overlay, nsamples = 50)
+pp_check(y.train, yrep4.posterior, ppc_dens_overlay, nsamples = 50)
+pp_check(y.train, yrep5.posterior, ppc_dens_overlay, nsamples = 50)
+pp_check(y.train, yrep6.posterior, ppc_dens_overlay, nsamples = 50)
 
-pp_check(y.train, yrep1.posterior, ppc_dens_overlay)
-pp_check(y.train, yrep2.posterior, ppc_dens_overlay)
-pp_check(y.train, yrep3.posterior, ppc_dens_overlay)
-pp_check(y.train, yrep4.posterior, ppc_dens_overlay)
+pp_check(y.train, yrep5.posterior, fun = "stat_grouped", group = train_imp$title, stat = "mean")
 
-pp_check(y.train, yrep.posterior1, fun = "stat_grouped", group = title, stat = "mean")
-pp_check(y.train, yrep.posterior1, ppc_bars)
-pp_check(y.train, yrep.posterior1, ppc_bars_grouped, group = title)
-pp_check(y.train, yrep.posterior1, ppc_rootogram)
-pp_check(multi_hier1_title_post.fit, type = "stat_2d")
-pp_check(multi_hier1_title_post.fit, type = "violin_grouped", group = "title")
-pp_check(multi_hier1_title_post.fit, type='error_scatter_avg')
+prop_zero <- function(x) mean(x == 1)
+prop_zero(y.train) # check proportion of zeros in y
+pp_check(y.train, yrep5.posterior, fun = "stat_grouped", stat = "prop_zero", group = train_imp$title)
 
 mcmc_intervals(multi_hier1_title_post.fit, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
 
@@ -434,16 +436,28 @@ fitrhs_cvvs <- cv_varsel(refmodel, method = 'forward', cv_method = 'LOO', nloo =
 solution_terms(fitrhs_cvvs)
 plot(fitrhs_cvvs, stats = c('elpd', 'rmse'), deltas=F)
 suggest_size(fitrhs_cvvs, alpha=0.025)
+
+# posterior classification accuracy for model5
+pred5 <- colMeans(yrep5.posterior)
+pr5 <- as.integer(pred5 >= 0.5)
+model5_pca <- round(mean(xor(pr5,as.integer(y.train==0))),2)
+
+# posterior balanced classification accuracy for model5
+model5_bpca <- round((mean(xor(pr5[y.train==0]>0.5,as.integer(y.train[y.train==0])))+mean(xor(pr5[y.train==1]<0.5,as.integer(y.train[y.train==1]))))/2,2)
 ```
 
-## 6 - Model Comparison
+## 6 - Additional Models and Model Improvements
+```{r additional models}
+```
+
+## 7 - Model Comparison
 ```{r model comparison}
-loo1 <- loo::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4)
-loo2 <- loo::loo(population_all.fit, save_psis = TRUE, cores = 4)
-loo3 <- loo::loo(population_all_hs.fit, save_psis = TRUE, cores = 4)
-loo4 <- loo::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4)
-loo5 <- loo::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4)
-loo6 <- loo::loo(multi_hier2_pClass_post.fit, save_psis = TRUE, cores = 4, moment_match = T)
+loo1 <- brms::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo2 <- brms::loo(population_all.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo3 <- brms::loo(population_all_hs.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo4 <- brms::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo5 <- brms::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo6 <- brms::loo(multi_hier2_pClass_post.fit, save_psis = TRUE, cores = 4, reloo = T)
 
 print(loo1)
 print(loo2)
@@ -459,49 +473,10 @@ plot(loo4, label_points = TRUE)
 plot(loo5, label_points = TRUE)
 plot(loo6, label_points = TRUE)
 
-loo::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6)
-
-# Marginal Posterior Predictive Checks
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep1.posterior,
-  lw = weights(loo1$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep2.posterior,
-  lw = weights(loo2$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep3.posterior,
-  lw = weights(loo3$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep4.posterior,
-  lw = weights(loo4$psis_object)
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep5.posterior,
-  lw = weights(loo5$psis_object),
-  boundary_correction = T
-)
-
-ppc_loo_pit_overlay(
-  y = y.train,
-  yrep = yrep6.posterior,
-  lw = weights(loo6$psis_object),
-  boundary_correction = T
-)
+brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7)
 ```
 
-## 7 - Prediction Submission
+## 8 - Prediction Submission
 ```{r predictions model1}
 probs1.hier <- apply(y_pred1.hier, 2, mean)
 preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
