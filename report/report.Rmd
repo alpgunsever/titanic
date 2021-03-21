@@ -190,6 +190,16 @@ for (i in 1:length(dat.full$Age)){
 }
 dat.full$Age <- as.numeric(dat.full$Age)
 
+# Making title more balanced
+dat.full$title <- as.character(dat.full$title)
+for (i in 1:length(dat.full$title)){
+  if(grepl("Master|Noble|Soldier",dat.full$title[i]) == T){
+    dat.full$title[i] <- "Other"  
+  } 
+}
+dat.full$title <- as.factor(dat.full$title)
+dat.full$title <- droplevels(dat.full$title)
+
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 g + geom_boxplot(data = dat.full.train, aes(Survived, Age))
 ```
@@ -228,9 +238,15 @@ pId.test <- test_imp$PassengerId # ID for predictions
 predictor.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor1.variables <- predictor.variables[predictor.variables != "title"]
 predictor2.variables <- predictor.variables[predictor.variables != "Pclass"]
+predictor3.variables <- predictor.variables[!predictor.variables %in% c("Ticket","Embarked")]
 
 formula_train <- as.formula(y.train~ .)
 formula_test <- as.formula(~ .)
+
+X <- subset(train_imp, select=predictor.variables)
+X0.train <- model.matrix(formula_train, data = X)[,-1]
+X <- subset(test_imp, select=predictor.variables)
+X0.test <- model.matrix(formula_test, data = X)[,-1]
 
 X <- subset(train_imp, select=predictor1.variables)
 X1.train <- model.matrix(formula_train, data = X)[,-1]
@@ -242,22 +258,40 @@ X2.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor2.variables)
 X2.test <- model.matrix(formula_test, data = X)[,-1]
 
+X <- subset(train_imp, select=predictor3.variables)
+X3.train <- model.matrix(formula_train, data = X)[,-1]
+X <- subset(test_imp, select=predictor3.variables)
+X3.test <- model.matrix(formula_test, data = X)[,-1]
 
+colnames(X0.train) <- gsub(" ", "", colnames(X0.train), fixed = TRUE)
+colnames(X0.test) <- gsub(" ", "", colnames(X0.test), fixed = TRUE)
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
 colnames(X1.test) <- gsub(" ", "", colnames(X1.test), fixed = TRUE)
 colnames(X2.train) <- gsub(" ", "", colnames(X2.train), fixed = TRUE)
 colnames(X2.test) <- gsub(" ", "", colnames(X2.test), fixed = TRUE)
+colnames(X3.train) <- gsub(" ", "", colnames(X3.train), fixed = TRUE)
+colnames(X3.test) <- gsub(" ", "", colnames(X3.test), fixed = TRUE)
 
+X0.train <- scale(X0.train)
+X0.test <- scale(X0.test)
 X1.train <- scale(X1.train)
 X1.test <- scale(X1.test)
 X2.train <- scale(X2.train)
 X2.test <- scale(X2.test)
+X3.train <- scale(X3.train)
+X3.test <- scale(X3.test)
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
 
 pClassTrain <- as.numeric(train_imp$Pclass)
 pClassTest <- as.numeric(test_imp$Pclass)
+
+ticketTrain <- as.numeric(train_imp$Ticket)
+ticketTest <- as.numeric(test_imp$Ticket)
+
+embarkedTrain <- as.numeric(train_imp$Embarked)
+embarkedTest <- as.numeric(test_imp$Embarked)
 ```
 
 ## 3- Prior Predictive Checking
@@ -266,11 +300,17 @@ We will perform a prior predictive check with only using the priors and no data.
 
 ```{r prior predictive checking}
 # Prior predictive checks
+df0.train <- as.data.frame(cbind(y.train, X0.train))
+
 title <- titleTrain
 df1.train <- as.data.frame(cbind(y.train, X1.train,title))
 
 pClass <- pClassTrain
 df2.train <- as.data.frame(cbind(y.train, X2.train,pClass))
+
+ticket <- ticketTrain
+embarked <- embarkedTrain
+df3.train <- as.data.frame(cbind(y.train, X3.train,ticket,embarked))
 
 formula_only_intercept_population <- as.formula(y.train ~ 1)
 formula_only_intercept_population <- bf(formula = formula_only_intercept_population, center = F)
@@ -278,7 +318,7 @@ formula_only_intercept_population <- bf(formula = formula_only_intercept_populat
 formula_only_intercept_population_and_group <- as.formula(y.train ~ 1 + (1|title))
 formula_only_intercept_population_and_group <- bf(formula = formula_only_intercept_population_and_group, center = F)
 
-formula_all_population <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"))))
+formula_all_population <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df0.train)[2:length(colnames(df0.train))], collapse = "+"))))
 formula_all_population <- bf(formula = formula_all_population, center = F)
 
 formula_hier1_title <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
@@ -301,19 +341,17 @@ multi_hier1_title_prior.fit <- brm(formula = formula_hier1_title,
 
 yrep.prior1 <- posterior_predict(multi_hier1_title_prior.fit)
 
-pp_check(y.train, yrep.prior1, ppc_dens_overlay, nsamples = 100)
-pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = title, stat = "mean")
-pp_check(y.train, yrep.prior1, ppc_bars)
-pp_check(y.train, yrep.prior1, ppc_bars_grouped, group = title)
-pp_check(y.train, yrep.prior1, ppc_rootogram)
-pp_check(multi_hier1_title_prior.fit, type = "stat_2d")
-pp_check(multi_hier1_title_prior.fit, type = "violin_grouped", group = "title")
+# Graphical checks
+pp_check(y.train, yrep.prior1[1:50,], ppc_dens_overlay)
+pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = train_imp$title, stat = "mean")
 ```
 
 We have used weakly informative robust prior of student_t(3,0,2.5) for both population-level and group-level parameters. We also used lkj(2) for the correlation matrix. It can be seen that the spread for prior predictive samples have much higher variance than the actual response variable for the training set. It confirms that the chosen prior can be used for posterior predictive check along with the likelihood.
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model fitting}
+df0.test <- as.data.frame(cbind(X0.test))
+
 title <- titleTest
 df1.test <- as.data.frame(cbind(X1.test,title))
 
@@ -332,7 +370,7 @@ only_population_intercept.fit <- brm(formula = formula_only_intercept_population
 
 # model 2: All predictors model with population effects only------------------------------------------
 population_all.fit <- brm(formula = formula_all_population,
-                                      data = df1.train,
+                                      data = df0.train,
                                       prior = prior0,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
@@ -342,7 +380,7 @@ population_all.fit <- brm(formula = formula_all_population,
 
 # model 3: All predictors model with population effects only and horseshoe prior----------------------
 population_all_hs.fit <- brm(formula = formula_all_population,
-                                      data = df1.train,
+                                      data = df0.train,
                                       prior = prior2,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
@@ -384,9 +422,9 @@ multi_hier2_pClass_post.fit <- brm(formula = formula_hier2_pClass,
 
 ```{r simulating posterior predictions}
 # making predictions
-y_pred1 <- posterior_predict(only_population_intercept.fit, df1.test)
-y_pred2 <- posterior_predict(population_all.fit, df1.test)
-y_pred3 <- posterior_predict(population_all_hs.fit, df1.test)
+y_pred1 <- posterior_predict(only_population_intercept.fit, df0.test)
+y_pred2 <- posterior_predict(population_all.fit, df0.test)
+y_pred3 <- posterior_predict(population_all_hs.fit, df0.test)
 y_pred4 <- posterior_predict(population_and_group_intercept.fit, df1.test)
 y_pred5 <- posterior_predict(multi_hier1_title_post.fit, df1.test)
 y_pred6 <- posterior_predict(multi_hier2_pClass_post.fit, df2.test)
@@ -411,31 +449,19 @@ summary(multi_hier2_pClass_post.fit)
 plot(conditional_effects(population_all.fit), ask = F)
 plot(conditional_effects(multi_hier1_title_post.fit), ask = F)
 
-pp_check(y.train, yrep1.posterior, ppc_dens_overlay, nsamples = 50)
-pp_check(y.train, yrep2.posterior, ppc_dens_overlay, nsamples = 50)
-pp_check(y.train, yrep3.posterior, ppc_dens_overlay, nsamples = 50)
-pp_check(y.train, yrep4.posterior, ppc_dens_overlay, nsamples = 50)
-pp_check(y.train, yrep5.posterior, ppc_dens_overlay, nsamples = 50)
-pp_check(y.train, yrep6.posterior, ppc_dens_overlay, nsamples = 50)
+pp_check(y.train, yrep1.posterior[1:50,], ppc_dens_overlay)
+pp_check(y.train, yrep2.posterior[1:50,], ppc_dens_overlay)
+pp_check(y.train, yrep3.posterior[1:50,], ppc_dens_overlay)
+pp_check(y.train, yrep4.posterior[1:50,], ppc_dens_overlay)
+pp_check(y.train, yrep5.posterior[1:50,], ppc_dens_overlay)
+pp_check(y.train, yrep6.posterior[1:50,], ppc_dens_overlay)
 
 pp_check(y.train, yrep5.posterior, fun = "stat_grouped", group = train_imp$title, stat = "mean")
-
-prop_zero <- function(x) mean(x == 1)
-prop_zero(y.train) # check proportion of zeros in y
-pp_check(y.train, yrep5.posterior, fun = "stat_grouped", stat = "prop_zero", group = train_imp$title)
-
-mcmc_intervals(multi_hier1_title_post.fit, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
+pp_check(y.train, yrep6.posterior, fun = "stat_grouped", group = train_imp$pClass, stat = "mean")
 
 mcmc_areas(population_all_hs.fit, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
 
 mcmc_hist(multi_hier1_title_post.fit, pars = c("b_Intercept",paste0("b_",colnames(df1.train)[2:(length(colnames(df1.train))-1)])))
-
-# predictor selection for horseshoe prior model
-refmodel <- get_refmodel(population_all_hs.fit)
-fitrhs_cvvs <- cv_varsel(refmodel, method = 'forward', cv_method = 'LOO', nloo = 100, verbose = TRUE)
-solution_terms(fitrhs_cvvs)
-plot(fitrhs_cvvs, stats = c('elpd', 'rmse'), deltas=F)
-suggest_size(fitrhs_cvvs, alpha=0.025)
 
 # posterior classification accuracy for model5
 pred5 <- colMeans(yrep5.posterior)
@@ -448,6 +474,61 @@ model5_bpca <- round((mean(xor(pr5[y.train==0]>0.5,as.integer(y.train[y.train==0
 
 ## 6 - Additional Models and Model Improvements
 ```{r additional models}
+
+# Interaction terms added to all predictors with population terms only model
+formula_all_population_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + Pclass3:AgeLog + FareLog:AgeLog + I(AgeLog^2))
+
+formula_all_population_interactions <- bf(formula = formula_all_population_interactions, center = F)
+
+population_all_interactions.fit <- brm(formula = formula_all_population_interactions,
+                                      data = df0.train,
+                                      prior = prior0,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
+
+# Interaction terms added to all predictors with hierarchical model grouped by title
+formula_multi_hier1_title_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + Pclass3:AgeLog + FareLog:AgeLog + I(AgeLog^2) + (1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog | title))
+
+formula_multi_hier1_title_interactions <- bf(formula = formula_multi_hier1_title_interactions, center = F)
+
+multi_hier1_title_post_interactions.fit <- brm(formula = formula_multi_hier1_title_interactions,
+                                       data = df1.train,
+                                       prior = prior1,
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
+
+# Interaction terms added to all predictors with hierarchical model grouped by pClass
+formula_multi_hier2_pClass_interactions <- as.formula(y.train ~ 1 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + titleOther:AgeLog + FareLog:AgeLog + I(AgeLog^2) + (1 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog | pClass))
+
+formula_multi_hier2_pClass_interactions <- bf(formula = formula_multi_hier2_pClass_interactions, center = F)
+
+multi_hier2_pClass_post_interactions.fit <- brm(formula = formula_multi_hier2_pClass_interactions,
+                                       data = df2.train,
+                                       prior = prior1,
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
+
+# Double grouping for hierarchical model with title and embarked
+formula_hier3_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df3.train)[2:(length(colnames(df3.train))-2)], collapse = "+")),"+(1+",paste(colnames(df3.train)[2:(length(colnames(df3.train))-2)], collapse = "+"),"|(ticket:embarked))"))
+formula_hier3_doubleClass <- bf(formula = formula_hier3_doubleClass, center = F)
+
+multi_hier3_doubleClass.fit <- brm(formula = formula_hier3_doubleClass,
+                                      data = df3.train,
+                                      prior = prior1,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 ```
 
 ## 7 - Model Comparison
@@ -458,6 +539,10 @@ loo3 <- brms::loo(population_all_hs.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo4 <- brms::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo5 <- brms::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo6 <- brms::loo(multi_hier2_pClass_post.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo7 <- brms::loo(population_all_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo8 <- brms::loo(multi_hier1_title_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo9 <- brms::loo(multi_hier2_pClass_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo10 <- brms::loo(multi_hier3_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
 
 print(loo1)
 print(loo2)
@@ -465,6 +550,10 @@ print(loo3)
 print(loo4)
 print(loo5)
 print(loo6)
+print(loo7)
+print(loo8)
+print(loo9)
+print(loo10)
 
 plot(loo1, label_points = TRUE)
 plot(loo2, label_points = TRUE)
@@ -472,8 +561,12 @@ plot(loo3, label_points = TRUE)
 plot(loo4, label_points = TRUE)
 plot(loo5, label_points = TRUE)
 plot(loo6, label_points = TRUE)
+plot(loo7, label_points = TRUE)
+plot(loo8, label_points = TRUE)
+plot(loo9, label_points = TRUE)
+plot(loo10, label_points = TRUE)
 
-brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7)
+brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10)
 ```
 
 ## 8 - Prediction Submission
