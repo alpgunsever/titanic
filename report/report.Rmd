@@ -25,6 +25,7 @@ theme_set(bayesplot::theme_default(base_family = "sans"))
 library(dplyr)
 library(gridExtra)
 library(brms)
+library(pROC)
 ```
 
 ## 2- Exploratory Data Analysis
@@ -239,6 +240,7 @@ predictor.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor1.variables <- predictor.variables[predictor.variables != "title"]
 predictor2.variables <- predictor.variables[predictor.variables != "Pclass"]
 predictor3.variables <- predictor.variables[!predictor.variables %in% c("Ticket","Embarked")]
+predictor4.variables <- predictor.variables[!predictor.variables %in% c("Pclass","isMale")]
 
 formula_train <- as.formula(y.train~ .)
 formula_test <- as.formula(~ .)
@@ -263,6 +265,11 @@ X3.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor3.variables)
 X3.test <- model.matrix(formula_test, data = X)[,-1]
 
+X <- subset(train_imp, select=predictor4.variables)
+X4.train <- model.matrix(formula_train, data = X)[,-1]
+X <- subset(test_imp, select=predictor4.variables)
+X4.test <- model.matrix(formula_test, data = X)[,-1]
+
 colnames(X0.train) <- gsub(" ", "", colnames(X0.train), fixed = TRUE)
 colnames(X0.test) <- gsub(" ", "", colnames(X0.test), fixed = TRUE)
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
@@ -271,6 +278,8 @@ colnames(X2.train) <- gsub(" ", "", colnames(X2.train), fixed = TRUE)
 colnames(X2.test) <- gsub(" ", "", colnames(X2.test), fixed = TRUE)
 colnames(X3.train) <- gsub(" ", "", colnames(X3.train), fixed = TRUE)
 colnames(X3.test) <- gsub(" ", "", colnames(X3.test), fixed = TRUE)
+colnames(X4.train) <- gsub(" ", "", colnames(X4.train), fixed = TRUE)
+colnames(X4.test) <- gsub(" ", "", colnames(X4.test), fixed = TRUE)
 
 X0.train <- scale(X0.train)
 X0.test <- scale(X0.test)
@@ -280,6 +289,8 @@ X2.train <- scale(X2.train)
 X2.test <- scale(X2.test)
 X3.train <- scale(X3.train)
 X3.test <- scale(X3.test)
+X4.train <- scale(X4.train)
+X4.test <- scale(X4.test)
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
@@ -292,6 +303,9 @@ ticketTest <- as.numeric(test_imp$Ticket)
 
 embarkedTrain <- as.numeric(train_imp$Embarked)
 embarkedTest <- as.numeric(test_imp$Embarked)
+
+isMaleTrain <- as.numeric(train_imp$isMale)
+isMaleTest <- as.numeric(test_imp$isMale)
 ```
 
 ## 3- Prior Predictive Checking
@@ -311,6 +325,9 @@ df2.train <- as.data.frame(cbind(y.train, X2.train,pClass))
 ticket <- ticketTrain
 embarked <- embarkedTrain
 df3.train <- as.data.frame(cbind(y.train, X3.train,ticket,embarked))
+
+isMale <- isMaleTrain
+df4.train <- as.data.frame(cbind(y.train,X4.train,pClass,isMale))
 
 formula_only_intercept_population <- as.formula(y.train ~ 1)
 formula_only_intercept_population <- bf(formula = formula_only_intercept_population, center = F)
@@ -529,6 +546,19 @@ multi_hier3_doubleClass.fit <- brm(formula = formula_hier3_doubleClass,
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
                                       save_pars = save_pars(all = TRUE),
                                       seed = 187)
+
+# Double grouping for hierarchical model with pClass and isMale
+formula_hier4_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df4.train)[2:(length(colnames(df4.train))-2)], collapse = "+")),"+(1+",paste(colnames(df4.train)[2:(length(colnames(df4.train))-2)], collapse = "+"),"|(pClass:isMale))"))
+formula_hier4_doubleClass <- bf(formula = formula_hier4_doubleClass, center = F)
+
+multi_hier4_doubleClass.fit <- brm(formula = formula_hier4_doubleClass,
+                                      data = df4.train,
+                                      prior = prior1,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 ```
 
 ## 7 - Model Comparison
@@ -543,6 +573,7 @@ loo7 <- brms::loo(population_all_interactions.fit, save_psis = TRUE, cores = 4, 
 loo8 <- brms::loo(multi_hier1_title_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo9 <- brms::loo(multi_hier2_pClass_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo10 <- brms::loo(multi_hier3_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo11 <- brms::loo(multi_hier4_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
 
 print(loo1)
 print(loo2)
@@ -554,6 +585,7 @@ print(loo7)
 print(loo8)
 print(loo9)
 print(loo10)
+print(loo11)
 
 plot(loo1, label_points = TRUE)
 plot(loo2, label_points = TRUE)
@@ -565,16 +597,48 @@ plot(loo7, label_points = TRUE)
 plot(loo8, label_points = TRUE)
 plot(loo9, label_points = TRUE)
 plot(loo10, label_points = TRUE)
+plot(loo11, label_points = TRUE)
 
-brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10)
+brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10,loo11)
+
+# using list of loo objects
+loo_list <- list(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10, loo11)
+loo_model_weights(loo_list)
 ```
 
 ## 8 - Prediction Submission
 ```{r predictions model1}
-probs1.hier <- apply(y_pred1.hier, 2, mean)
-preds1.hier <- ifelse(probs1.hier > .5, 1, 0)
+title <- titleTest
+pClass <- pClassTest
+ticket <- ticketTest
+embarked <- embarkedTest
+isMale <- isMaleTest
 
-model1_hier.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds1.hier)
-write.csv(x = model1_hier.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model1_hier_title.csv"),
+df.preds <- cbind(df0.test,title,pClass,ticket,embarked,isMale)
+
+probs_all <- brms::pp_average(only_population_intercept.fit,population_all.fit,population_all_hs.fit,
+                          population_and_group_intercept.fit,multi_hier1_title_post.fit,
+                          multi_hier2_pClass_post.fit,population_all_interactions.fit,
+                          multi_hier1_title_post_interactions.fit,multi_hier2_pClass_post_interactions.fit,
+                          multi_hier3_doubleClass.fit,multi_hier4_doubleClass.fit,
+                          newdata = df.preds, allow_new_levels = T)
+
+preds_all <- ifelse(probs_all[,1] > 0.5, 1, 0)
+
+model_all.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds_all)
+write.csv(x = model_all.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model_bma.csv"),
+          row.names = FALSE)
+
+# prediction with best predictive performance model according to loo
+ticket <- ticketTest
+embarked <- embarkedTest
+df3.test <- as.data.frame(cbind(X3.test,ticket,embarked))
+
+y_pred10<- posterior_predict(multi_hier3_doubleClass.fit, df3.test, allow_new_levels = T)
+prob10 <- colMeans(y_pred10)
+pred10 <- as.integer(prob10 >= 0.5)
+
+model_doubleClass.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred10)
+write.csv(x = model_doubleClass.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model_doubleClass.csv"),
           row.names = FALSE)
 ```
