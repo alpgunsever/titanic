@@ -1,11 +1,11 @@
 ---
-title: "titanic_report"
+title: "Bayesian Data Analysis Report on Titanic Dataset"
 author: "Alp Gunsever"
 date: "13/01/2021"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, cache=TRUE}
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 This is a data analysis report intended to test bayesian data analysis skills using the titanic dataset from kaggle.
 
-```{r libraries}
+```{r libraries, cache=TRUE, eval=FALSE, echo=FALSE}
 library(stringr)
 library(corrplot)
 library(projpred)
@@ -34,7 +34,17 @@ We are first going to make an exploratory analysis on the data available at hand
 
 The existing observations for different predictors will be formatted into data structures that can be handled by R in a meaningful way. 
 
-```{r clean data}
+The following adjustments have been implemented to the training and test data sets together after they are combined into a single dataset:
+
+* Passenger class predictor is transformed into factor type
+* Titles have been extracted from the name variable and factored into Mr, Mrs, Miss, Master, Noble and Soldier levels.
+* Cabin predictor is transformed into factor type.
+* Embarked predictor is transformed into factor type.
+* Ticket predictor is factored into L, F, P, C, A, S, W based on the letter they contain and into the number of digits if there is no letter in the ticket name. 3, 7, A, F, L, W types are combined into "Other" level as there are not so many observations in those factored levels.
+* Family size predictor is created based on number of siblings and spouses including self. Family type predictor is created based on the family size predictor. If the number of family members are equal to 1, then family type is assigned to "Singleton". If family size is between 1 and 4, then family type is assigned to "small". If family size is greater than 4, then family type is assigned to "large". Family type is factored into these 3 levels.
+* Sex predictor is changed to isMale and factored as a binary predictor.
+
+```{r clean data, cache=TRUE, echo=FALSE}
 # read train and test data
 dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
 dat.train <- read.csv(file.path(dir,"train.csv"))
@@ -122,16 +132,16 @@ dat.full <- dat.full[ , -which(names(dat.full) %in% c("Sex"))]
 dat.full <- dat.full[ , -which(names(dat.full) %in% c("Name"))]
 ```
 
-After getting rid of spaces in the character values and factorizing them as well as transforming the numerical variables, now let's look at the data summary.
+The data summary can be seen below:
 
-```{r data summary}
+```{r data summary, cache=TRUE, echo=FALSE}
 summary(dat.full)
 str(dat.full)
 ```
 
 Cabin and age predictors have a lot of missing observations so it can be beneficial to get rid of these predictors but we will also be losing a lot of information so it makes sense to further investigate if imputation is possible.
 
-```{r visual check with available data1}
+```{r visual check with available data1, cache=TRUE, eval=FALSE, echo=FALSE}
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 g <- ggplot()
 title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = mean(Age, na.rm = T), 
@@ -177,7 +187,7 @@ grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
 
 We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
 
-```{r visual check with available data2}
+```{r visual check with available data2, cache=TRUE, eval=FALSE, echo=FALSE}
 #Imputing the age variable
 for (i in 1:length(dat.full$Age)){
   if(is.na(dat.full$Age[i])==T){
@@ -209,7 +219,7 @@ Individuals that are upper class passengers, are members of small families(2 to 
 
 Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor.
 
-```{r missing data}
+```{r missing data, cache=TRUE, eval=FALSE, echo=FALSE}
 dat.full <- dat.full[ , !(names(dat.full) %in% c("Cabin"))]
 md.pattern(dat.full, rotate.names = TRUE)
 
@@ -230,7 +240,7 @@ test_imp <- dat.full_imp[892:1309,]
 
 The imputed dataset will be used for analysis.
 
-```{r model input}
+```{r model input, cache=TRUE, eval=FALSE, echo=FALSE}
 y.train <- as.numeric(train_imp$Survived) # outcome
 y.train <- y.train-1
 pId.train <- train_imp$PassengerId # ID for predictions
@@ -312,7 +322,7 @@ isMaleTest <- as.numeric(test_imp$isMale)
 
 We will perform a prior predictive check with only using the priors and no data.The reason for making prior predictive analysis is to make a sanity check on the priors without using the likelihood. 
 
-```{r prior predictive checking}
+```{r prior predictive checking, cache=TRUE, eval=FALSE, echo=FALSE}
 # Prior predictive checks
 df0.train <- as.data.frame(cbind(y.train, X0.train))
 
@@ -366,7 +376,7 @@ pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = train_imp$title, st
 We have used weakly informative robust prior of student_t(3,0,2.5) for both population-level and group-level parameters. We also used lkj(2) for the correlation matrix. It can be seen that the spread for prior predictive samples have much higher variance than the actual response variable for the training set. It confirms that the chosen prior can be used for posterior predictive check along with the likelihood.
 
 ## 4 - Model Fitting and Algorithm Diagnostics
-```{r model fitting}
+```{r model fitting, cache=TRUE, eval=FALSE, echo=FALSE}
 df0.test <- as.data.frame(cbind(X0.test))
 
 title <- titleTest
@@ -437,7 +447,7 @@ multi_hier2_pClass_post.fit <- brm(formula = formula_hier2_pClass,
 ```
 
 
-```{r simulating posterior predictions}
+```{r simulating posterior predictions, cache=TRUE, eval=FALSE, echo=FALSE}
 # making predictions
 y_pred1 <- posterior_predict(only_population_intercept.fit, df0.test)
 y_pred2 <- posterior_predict(population_all.fit, df0.test)
@@ -455,7 +465,7 @@ yrep6.posterior <- posterior_predict(multi_hier2_pClass_post.fit)
 ```
 
 ## 5 - Posterior Predictive Checking
-```{r posterior predictive checking}
+```{r posterior predictive checking, cache=TRUE, eval=FALSE, echo=FALSE}
 summary(only_population_intercept.fit)
 summary(population_all.fit)
 summary(population_all_hs.fit)
@@ -490,7 +500,7 @@ model5_bpca <- round((mean(xor(pr5[y.train==0]>0.5,as.integer(y.train[y.train==0
 ```
 
 ## 6 - Additional Models and Model Improvements
-```{r additional models}
+```{r additional models, cache=TRUE, eval=FALSE, echo=FALSE}
 
 # Interaction terms added to all predictors with population terms only model
 formula_all_population_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + Pclass3:AgeLog + FareLog:AgeLog + I(AgeLog^2))
@@ -562,7 +572,7 @@ multi_hier4_doubleClass.fit <- brm(formula = formula_hier4_doubleClass,
 ```
 
 ## 7 - Model Comparison
-```{r model comparison}
+```{r model comparison, cache=TRUE, eval=FALSE, echo=FALSE}
 loo1 <- brms::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo2 <- brms::loo(population_all.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo3 <- brms::loo(population_all_hs.fit, save_psis = TRUE, cores = 4, reloo = T)
@@ -607,7 +617,7 @@ loo_model_weights(loo_list)
 ```
 
 ## 8 - Prediction Submission
-```{r predictions model1}
+```{r predictions model1, cache=TRUE, eval=FALSE, echo=FALSE}
 title <- titleTest
 pClass <- pClassTest
 ticket <- ticketTest
