@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ## 1 - Introduction 
 
-This is a data analysis report intended to test bayesian data analysis skills using the titanic dataset from kaggle.
+This is a data analysis report intended to test bayesian data analysis skills using the titanic dataset from Kaggle. A bayesian data analysis framework will be followed to perform a full analysis on the titanic dataset. The analysis will be finalized by coming up with a final model and making a prediction with it in the Kaggle competition. All the results and observations will be shared and explained as much as possible for the whole process.
 
 ```{r libraries, cache=TRUE, eval=FALSE, echo=FALSE}
 library(stringr)
@@ -30,19 +30,17 @@ library(pROC)
 
 ## 2- Exploratory Data Analysis
 
-We are first going to make an exploratory analysis on the data available at hand. We format the data beforehand in both training and test sets.
-
-The existing observations for different predictors will be formatted into data structures that can be handled by R in a meaningful way. 
+It will be beneficial to look into the raw data available before getting into any analysis work. However, to be able to observe the data at hand, the existing observations for different predictors will be formatted into data structures that can be handled by R in a meaningful way.
 
 The following adjustments have been implemented to the training and test data sets together after they are combined into a single dataset:
 
-* Passenger class predictor is transformed into factor type
+* Passenger class predictor is transformed into factor type.
 * Titles have been extracted from the name variable and factored into Mr, Mrs, Miss, Master, Noble and Soldier levels.
 * Cabin predictor is transformed into factor type.
 * Embarked predictor is transformed into factor type.
 * Ticket predictor is factored into L, F, P, C, A, S, W based on the letter they contain and into the number of digits if there is no letter in the ticket name. 3, 7, A, F, L, W types are combined into "Other" level as there are not so many observations in those factored levels.
-* Family size predictor is created based on number of siblings and spouses including self. Family type predictor is created based on the family size predictor. If the number of family members are equal to 1, then family type is assigned to "Singleton". If family size is between 1 and 4, then family type is assigned to "small". If family size is greater than 4, then family type is assigned to "large". Family type is factored into these 3 levels.
-* Sex predictor is changed to isMale and factored as a binary predictor.
+* Family size predictor is created based on number of siblings and spouses including self. Family type predictor is created based on the family size predictor. If the total number of family members are equal to 1, then family type is assigned to "Singleton". If family size is between 1 and 4, then family type is assigned to "small". If family size is greater than 4, then family type is assigned to "large". Family type is factored into these 3 levels.
+* Sex predictor is changed to isMale and factored as a binary predictor with 1 indicating a male passenger and 0 a female passenger.
 
 ```{r clean data, cache=TRUE, echo=FALSE}
 # read train and test data
@@ -134,14 +132,19 @@ dat.full <- dat.full[ , -which(names(dat.full) %in% c("Name"))]
 
 The data summary can be seen below:
 
-```{r data summary, cache=TRUE, echo=FALSE}
+```{r data summary1, cache=TRUE, echo=FALSE}
 summary(dat.full)
+```
+
+Age predictor has 263 missing observations, fare has 1, cabin has 1014 and embarked has 2 out of a total of 1309 observations. It seems still possible to replace the missing observations even in Age predictor but imputing the cabin predictor can bring a lot of noise to the data. So the cabin predictor will be dropped but the rest of the predictors will be imputed. However, before getting to that part, it will be best to look at the data summary below showing the structure of each predictor:
+
+```{r data summary2, cache=TRUE, echo=FALSE}
 str(dat.full)
 ```
 
-Cabin and age predictors have a lot of missing observations so it can be beneficial to get rid of these predictors but we will also be losing a lot of information so it makes sense to further investigate if imputation is possible.
+Another step to take before getting into the imputation is to look at the available data visually. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the right shows the number of observations for each title:
 
-```{r visual check with available data1, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data1, cache=TRUE, echo=FALSE}
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 g <- ggplot()
 title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = mean(Age, na.rm = T), 
@@ -149,11 +152,18 @@ title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = me
 p1 <- g + geom_col(data = title_avAge,aes(x=title,y=avAge),fill = "deepskyblue3")
 p2 <- g + geom_col(data = title_avAge,aes(x=title,y=n),fill = "salmon3")
 grid.arrange(p1,p2, ncol=2)
+```
 
+The average age for the title make sense with Master having the lowest average age and Soldier, which probably represents the seniors that have been in military at some point. It can also be seen that most of the passengers are middle aged men and there are few of nobles and soldiers. The next two graphs below show the relationship between the title and the survival rate:
+
+```{r visual check with available data2, cache=TRUE, echo=FALSE}
 survtitle1 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "stack")
 survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "fill")
 grid.arrange(survtitle1,survtitle2, ncol=2)
+```
 
+
+```{r visual check with available data3, cache=TRUE, eval=FALSE, echo=FALSE}
 ticket_avFare <- dat.full.train %>% group_by(Ticket) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 g + geom_col(data = ticket_avFare,aes(x=Ticket,y=avFare),fill = "deepskyblue3")
 
@@ -187,7 +197,7 @@ grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
 
 We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
 
-```{r visual check with available data2, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data4, cache=TRUE, eval=FALSE, echo=FALSE}
 #Imputing the age variable
 for (i in 1:length(dat.full$Age)){
   if(is.na(dat.full$Age[i])==T){
