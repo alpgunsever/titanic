@@ -142,9 +142,9 @@ Age predictor has 263 missing observations, fare has 1, cabin has 1014 and embar
 str(dat.full)
 ```
 
-Another step to take before getting into the imputation is to look at the available data visually. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the right shows the number of observations for each title:
+Another step to take before getting into data imputation is to look at the available data visually. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the number of observations for each title:
 
-```{r visual check with available data1, cache=TRUE, echo=FALSE}
+```{r visual check with available data1, cache=TRUE, echo=FALSE, fig.height = 3.5}
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 g <- ggplot()
 title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = mean(Age, na.rm = T), 
@@ -154,14 +154,15 @@ p2 <- g + geom_col(data = title_avAge,aes(x=title,y=n),fill = "salmon3")
 grid.arrange(p1,p2, ncol=2)
 ```
 
-The average age for the title make sense with Master having the lowest average age and Soldier, which probably represents the seniors that have been in military at some point. It can also be seen that most of the passengers are middle aged men and there are few of nobles and soldiers. The next two graphs below show the relationship between the title and the survival rate:
+The average age for the title make sense with Master having the lowest average age and Soldier representing seniors that have been in military at some point. It can also be seen that most of the passengers are middle aged men and there are few of nobles and soldiers. The next two graphs below show the relationship between these titles and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each title is shown on the below right graph:
 
-```{r visual check with available data2, cache=TRUE, echo=FALSE}
-survtitle1 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "stack")
-survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "fill")
+```{r visual check with available data2, cache=TRUE, echo=FALSE, fig.height = 3.5}
+survtitle1 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "stack") + theme(axis.text.x=element_text(angle = 45, vjust = 1))
+survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "fill") + theme(axis.text.x=element_text(angle = 45, vjust = 1))
 grid.arrange(survtitle1,survtitle2, ncol=2)
 ```
 
+Text will be entered here!
 
 ```{r visual check with available data3, cache=TRUE, eval=FALSE, echo=FALSE}
 ticket_avFare <- dat.full.train %>% group_by(Ticket) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
