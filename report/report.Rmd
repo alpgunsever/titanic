@@ -162,26 +162,45 @@ survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived),
 grid.arrange(survtitle1,survtitle2, ncol=2)
 ```
 
-Text will be entered here!
+It can be seen that middle aged men have lower survival rates in comparison to the other titles on the ship. Young passengers and female passengers seem to have a higher survival rate. Next graph below shows the average fare per ticket type whereas the one on the right shows the number of observations for each ticket type:
 
-```{r visual check with available data3, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data3, cache=TRUE, echo=FALSE, fig.height = 3.5}
 ticket_avFare <- dat.full.train %>% group_by(Ticket) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
-g + geom_col(data = ticket_avFare,aes(x=Ticket,y=avFare),fill = "deepskyblue3")
+t1 <- g + geom_col(data = ticket_avFare,aes(x=Ticket,y=avFare),fill = "deepskyblue3")
+t2 <- g + geom_col(data = ticket_avFare,aes(x=Ticket,y=n),fill = "salmon3")
+grid.arrange(t1,t2, ncol=2)
+```
 
-survClass1 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "stack")
-survClass2 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "fill")
-grid.arrange(survClass1,survClass2, ncol=2)
+It can be seen that the average ticket prices are similar except for type 5 and type P, both of which are much more expensive compared to other ticket types. It can also be seen that ticket type 6 is the most sold one compared to the other types which are similar in amount. The next two graphs below show the relationship between these ticket types and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each ticket type is shown on the below right graph:
 
-Pclass_avFare <- dat.full.train %>% group_by(Pclass) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
-g + geom_col(data = Pclass_avFare,aes(x=Pclass,y=avFare),fill = "deepskyblue3")
-
-survCabin1 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "stack")
-survCabin2 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "fill")
-grid.arrange(survCabin1,survCabin2, ncol=2)
-
+```{r visual check with available data4, cache=TRUE, echo=FALSE, fig.height = 3.5}
 survTicket1 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "stack")
 survTicket2 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "fill")
 grid.arrange(survTicket1,survTicket2, ncol=2)
+```
+
+It is a bit hard to make separate conclusions for each ticket type but an obvious one is that the passengers having expensive ticket types have higher survival rates. Next graph below shows the average fare per passenger class whereas the one on the right shows the number of observations for each passenger class:
+
+```{r visual check with available data5, cache=TRUE, echo=FALSE, fig.height = 3.5}
+Pclass_avFare <- dat.full.train %>% group_by(Pclass) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
+pc1 <- g + geom_col(data = Pclass_avFare,aes(x=Pclass,y=avFare),fill = "deepskyblue3")
+pc2 <- g + geom_col(data = Pclass_avFare,aes(x=Pclass,y=n),fill = "salmon3")
+grid.arrange(pc1,pc2, ncol=2)
+```
+
+As expected, class 1 passengers pay the highest price compared to other passenger classes. It can also be observed that Class 3 passengers have the highest number. The interesting observation is that class 2 passengers are less in amount in comparison to class 1 passengers. The next two graphs below show the relationship between these passenger classes and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each passenger class is shown on the below right graph:   
+```{r visual check with available data6, cache=TRUE, echo=FALSE, fig.height = 3.5}
+survClass1 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "stack")
+survClass2 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "fill")
+grid.arrange(survClass1,survClass2, ncol=2)
+```
+
+The survival rate is proportional to the passenger class with passengers that pay the highest price survive the most proportionally. 
+
+```{r visual check with available data7, cache=TRUE, eval=FALSE, echo=FALSE}
+survCabin1 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "stack")
+survCabin2 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "fill")
+grid.arrange(survCabin1,survCabin2, ncol=2)
 
 g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Cabin), position = "stack")
 g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Cabin), position = "stack")
@@ -198,7 +217,7 @@ grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
 
 We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
 
-```{r visual check with available data4, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data8, cache=TRUE, eval=FALSE, echo=FALSE}
 #Imputing the age variable
 for (i in 1:length(dat.full$Age)){
   if(is.na(dat.full$Age[i])==T){
@@ -262,6 +281,7 @@ predictor1.variables <- predictor.variables[predictor.variables != "title"]
 predictor2.variables <- predictor.variables[predictor.variables != "Pclass"]
 predictor3.variables <- predictor.variables[!predictor.variables %in% c("Ticket","Embarked")]
 predictor4.variables <- predictor.variables[!predictor.variables %in% c("Pclass","isMale")]
+predictor5.variables <- predictor.variables[!predictor.variables %in% c("Pclass","title")]
 
 formula_train <- as.formula(y.train~ .)
 formula_test <- as.formula(~ .)
@@ -291,6 +311,11 @@ X4.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor4.variables)
 X4.test <- model.matrix(formula_test, data = X)[,-1]
 
+X <- subset(train_imp, select=predictor5.variables)
+X5.train <- model.matrix(formula_train, data = X)[,-1]
+X <- subset(test_imp, select=predictor5.variables)
+X5.test <- model.matrix(formula_test, data = X)[,-1]
+
 colnames(X0.train) <- gsub(" ", "", colnames(X0.train), fixed = TRUE)
 colnames(X0.test) <- gsub(" ", "", colnames(X0.test), fixed = TRUE)
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
@@ -301,6 +326,8 @@ colnames(X3.train) <- gsub(" ", "", colnames(X3.train), fixed = TRUE)
 colnames(X3.test) <- gsub(" ", "", colnames(X3.test), fixed = TRUE)
 colnames(X4.train) <- gsub(" ", "", colnames(X4.train), fixed = TRUE)
 colnames(X4.test) <- gsub(" ", "", colnames(X4.test), fixed = TRUE)
+colnames(X5.train) <- gsub(" ", "", colnames(X5.train), fixed = TRUE)
+colnames(X5.test) <- gsub(" ", "", colnames(X5.test), fixed = TRUE)
 
 X0.train <- scale(X0.train)
 X0.test <- scale(X0.test)
@@ -312,6 +339,8 @@ X3.train <- scale(X3.train)
 X3.test <- scale(X3.test)
 X4.train <- scale(X4.train)
 X4.test <- scale(X4.test)
+X5.train <- scale(X5.train)
+X5.test <- scale(X5.test)
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
@@ -349,6 +378,8 @@ df3.train <- as.data.frame(cbind(y.train, X3.train,ticket,embarked))
 
 isMale <- isMaleTrain
 df4.train <- as.data.frame(cbind(y.train,X4.train,pClass,isMale))
+
+df5.train <- as.data.frame(cbind(y.train,X5.train,pClass,title))
 
 formula_only_intercept_population <- as.formula(y.train ~ 1)
 formula_only_intercept_population <- bf(formula = formula_only_intercept_population, center = F)
@@ -580,6 +611,19 @@ multi_hier4_doubleClass.fit <- brm(formula = formula_hier4_doubleClass,
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
                                       save_pars = save_pars(all = TRUE),
                                       seed = 187)
+
+# Double grouping for hierarchical model with fare variable and grouped by pClass and title
+formula_hier5_doubleClass <- as.formula(y.train ~ 1 + FareLog + (1 + FareLog | pClass:title))
+formula_hier5_doubleClass <- bf(formula = formula_hier5_doubleClass, center = F)
+
+multi_hier5_doubleClass.fit <- brm(formula = formula_hier5_doubleClass,
+                                      data = df5.train,
+                                      prior = prior1,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
 ```
 
 ## 7 - Model Comparison
@@ -595,6 +639,7 @@ loo8 <- brms::loo(multi_hier1_title_post_interactions.fit, save_psis = TRUE, cor
 loo9 <- brms::loo(multi_hier2_pClass_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo10 <- brms::loo(multi_hier3_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
 loo11 <- brms::loo(multi_hier4_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
+loo12 <- brms::loo(multi_hier5_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
 
 print(loo1)
 print(loo2)
@@ -607,6 +652,7 @@ print(loo8)
 print(loo9)
 print(loo10)
 print(loo11)
+print(loo12)
 
 plot(loo1, label_points = TRUE)
 plot(loo2, label_points = TRUE)
@@ -619,11 +665,12 @@ plot(loo8, label_points = TRUE)
 plot(loo9, label_points = TRUE)
 plot(loo10, label_points = TRUE)
 plot(loo11, label_points = TRUE)
+plot(loo12, label_points = TRUE)
 
-brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10,loo11)
+brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10,loo11,loo12)
 
 # using list of loo objects
-loo_list <- list(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10, loo11)
+loo_list <- list(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10, loo11,loo12)
 loo_model_weights(loo_list)
 ```
 
@@ -641,7 +688,7 @@ probs_all <- brms::pp_average(only_population_intercept.fit,population_all.fit,p
                           population_and_group_intercept.fit,multi_hier1_title_post.fit,
                           multi_hier2_pClass_post.fit,population_all_interactions.fit,
                           multi_hier1_title_post_interactions.fit,multi_hier2_pClass_post_interactions.fit,
-                          multi_hier3_doubleClass.fit,multi_hier4_doubleClass.fit,
+                          multi_hier3_doubleClass.fit,multi_hier4_doubleClass.fit,multi_hier5_doubleClass.fit,
                           newdata = df.preds, allow_new_levels = T)
 
 preds_all <- ifelse(probs_all[,1] > 0.5, 1, 0)
