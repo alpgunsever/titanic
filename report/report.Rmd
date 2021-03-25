@@ -130,7 +130,7 @@ dat.full <- dat.full[ , -which(names(dat.full) %in% c("Sex"))]
 dat.full <- dat.full[ , -which(names(dat.full) %in% c("Name"))]
 ```
 
-The data summary can be seen below:
+The data summary for training and test sets combined can be seen below:
 
 ```{r data summary1, cache=TRUE, echo=FALSE}
 summary(dat.full)
@@ -142,7 +142,7 @@ Age predictor has 263 missing observations, fare has 1, cabin has 1014 and embar
 str(dat.full)
 ```
 
-Another step to take before getting into data imputation is to look at the available data visually. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the number of observations for each title:
+Another step to take before getting into data imputation is to look at the available data visually. However, to keep the test set information seperate, the exploratory visual checks will be performed only on training set. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the number of observations for each title:
 
 ```{r visual check with available data1, cache=TRUE, echo=FALSE, fig.height = 3.5}
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
@@ -195,13 +195,41 @@ survClass2 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived)
 grid.arrange(survClass1,survClass2, ncol=2)
 ```
 
-The survival rate is proportional to the passenger class with passengers that pay the highest price survive the most proportionally. 
+The survival rate is proportional to the passenger class with passengers that pay the highest price survive the most proportionally. Next we will check the cabin predictor in the same manner.
 
-```{r visual check with available data7, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data7, cache=TRUE, echo=FALSE, fig.height = 3.5}
+cabin_avFare <- dat.full.train %>% group_by(Cabin) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
+cab1 <- g + geom_col(data = cabin_avFare,aes(x=Cabin,y=avFare),fill = "deepskyblue3")
+cab2 <- g + geom_col(data = cabin_avFare,aes(x=Cabin,y=n),fill = "salmon3")
+grid.arrange(cab1,cab2, ncol=2)
+```
+
+As mentioned before, the number of missing values for the cabin predictor is very high. This means either the cabin predictor will be dropped from analysis, which will result in loss of information, or a logic will be applied for imputation of the missing values. The following graphs show the relationship of the cabin predictor to survival rate:
+
+```{r visual check with available data8, cache=TRUE, echo=FALSE, fig.height = 3.5}
 survCabin1 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "stack")
 survCabin2 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "fill")
 grid.arrange(survCabin1,survCabin2, ncol=2)
+```
 
+There is not a particular pattern that can be noticed immediately but again cabins with passengers that have paid higher ticket fees tend to have higher survival rate. Next we will check the family size predictor in similar fashion to other predictors above:
+
+```{r visual check with available data9, cache=TRUE, echo=FALSE, fig.height = 3.5}
+fSize_avFare <- dat.full.train %>% group_by(fSize) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
+f1 <- g + geom_col(data = fSize_avFare,aes(x=fSize,y=avFare),fill = "deepskyblue3")
+f2 <- g + geom_col(data = fSize_avFare,aes(x=fSize,y=n),fill = "salmon3")
+grid.arrange(f1,f2, ncol=2)
+```
+
+The next two graphs show the family size relationship to survival rate:
+
+```{r visual check with available data10, cache=TRUE, echo=FALSE, fig.height = 3.5}
+survfSize1 <- g + geom_bar(data = dat.full.train, aes(x=fSize, fill = Survived), position = "stack")
+survfSize2 <- g + geom_bar(data = dat.full.train, aes(x=fSize, fill = Survived), position = "fill")
+grid.arrange(survfSize1,survfSize2, ncol=2)
+```
+
+```{r visual check with available data11, cache=TRUE, eval=FALSE, echo=FALSE}
 g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Cabin), position = "stack")
 g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Cabin), position = "stack")
 g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Ticket), position = "stack")
@@ -217,7 +245,7 @@ grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
 
 We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
 
-```{r visual check with available data8, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data12, cache=TRUE, eval=FALSE, echo=FALSE}
 #Imputing the age variable
 for (i in 1:length(dat.full$Age)){
   if(is.na(dat.full$Age[i])==T){
