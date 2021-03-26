@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 This is a data analysis report intended to test bayesian data analysis skills using the titanic dataset from Kaggle. A bayesian data analysis framework will be followed to perform a full analysis on the titanic dataset. The analysis will be finalized by coming up with a final model and making a prediction with it in the Kaggle competition. All the results and observations will be shared and explained as much as possible for the whole process.
 
-```{r libraries, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r libraries, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE}
 library(stringr)
 library(corrplot)
 library(projpred)
@@ -38,7 +38,7 @@ The following adjustments have been implemented to the training and test data se
 * Titles have been extracted from the name variable and factored into Mr, Mrs, Miss, Master, Noble and Soldier levels.
 * Cabin predictor is transformed into factor type.
 * Embarked predictor is transformed into factor type.
-* Ticket predictor is factored into L, F, P, C, A, S, W based on the letter they contain and into the number of digits if there is no letter in the ticket name. 3, 7, A, F, L, W types are combined into "Other" level as there are not so many observations in those factored levels.
+* Ticket predictor is factored into the number of digits of the number part of the ticket. Factors "2","3" and "7" has few observations so they will be combined into a factor level called "Other".
 * Family size predictor is created based on number of siblings and spouses including self. Family type predictor is created based on the family size predictor. If the total number of family members are equal to 1, then family type is assigned to "Singleton". If family size is between 1 and 4, then family type is assigned to "small". If family size is greater than 4, then family type is assigned to "large". Family type is factored into these 3 levels.
 * Sex predictor is changed to isMale and factored as a binary predictor with 1 indicating a male passenger and 0 a female passenger.
 
@@ -90,23 +90,23 @@ dat.full$Embarked[dat.full$Embarked==""] <- NA
 dat.full$Embarked <- as.factor(dat.full$Embarked)
 
 # reduce factor size of ticket variable
-dat.full$Ticket <- as.character(dat.full$Ticket)
-dat.full$Ticket[grepl("L",dat.full$Ticket) == TRUE] <- "L"
-dat.full$Ticket[grepl("F",dat.full$Ticket) == TRUE] <- "F"
-dat.full$Ticket[grepl("PC|P",dat.full$Ticket) == TRUE] <- "P"
-dat.full$Ticket[grepl("CA|C.A.|CA.|C ",dat.full$Ticket) == TRUE] <- "C"
-dat.full$Ticket[grepl("A/5|A/5.|A.5.|A./5.|A/4.|A4.|A|A.|AQ",dat.full$Ticket) == TRUE] <- "A"
-dat.full$Ticket[grepl("S",dat.full$Ticket) == TRUE] <- "S"
-dat.full$Ticket[grepl("W",dat.full$Ticket) == TRUE] <- "W"
+for (i in 1:length(dat.full$Ticket)) {
+  if (length(strsplit(dat.full$Ticket[i], " ")[[1]]) == 2) {
+    dat.full$Ticket[i] <- strsplit(dat.full$Ticket[i], " ")[[1]][2]  
+  } else{
+    dat.full$Ticket[i] <- strsplit(dat.full$Ticket[i], " ")[[1]][1]   
+  }
+  
+}
+
 dat.full$Ticket <- sapply(dat.full$Ticket, function(x) ifelse(nchar(x)>1,as.character(nchar(x)),x))
 
- for (i in 1:length(dat.full$Ticket)) {
-   if (dat.full$Ticket[i] == '3' || dat.full$Ticket[i] == '7' || dat.full$Ticket[i] == 'A' || dat.full$Ticket[i] == 'F' ||
-       dat.full$Ticket[i] == 'L' || dat.full$Ticket[i] == 'W'){
+for (i in 1:length(dat.full$Ticket)) {
+   if (dat.full$Ticket[i] == '2' || dat.full$Ticket[i] == '3' || dat.full$Ticket[i] == '7'){
      dat.full$Ticket[i] <- "Other"
-       }
-   
- }
+   }
+}
+
 dat.full$Ticket <- as.factor(dat.full$Ticket)
 
 # Create family size variable including the passenger itself
@@ -144,7 +144,7 @@ str(dat.full)
 
 Another step to take before getting into data imputation is to look at the available data visually. However, to keep the test set information seperate, the exploratory visual checks will be performed only on training set. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the number of observations for each title:
 
-```{r visual check with available data1, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data1, cache=TRUE, echo=FALSE, fig.height = 3}
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 g <- ggplot()
 title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = mean(Age, na.rm = T), 
@@ -156,7 +156,7 @@ grid.arrange(p1,p2, ncol=2)
 
 The average age for the title make sense with Master having the lowest average age and Soldier representing seniors that have been in military at some point. It can also be seen that most of the passengers are middle aged men and there are few of nobles and soldiers. The next two graphs below show the relationship between these titles and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each title is shown on the below right graph:
 
-```{r visual check with available data2, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data2, cache=TRUE, echo=FALSE, fig.height = 3}
 survtitle1 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "stack") + theme(axis.text.x=element_text(angle = 45, vjust = 1))
 survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "fill") + theme(axis.text.x=element_text(angle = 45, vjust = 1))
 grid.arrange(survtitle1,survtitle2, ncol=2)
@@ -164,7 +164,7 @@ grid.arrange(survtitle1,survtitle2, ncol=2)
 
 It can be seen that middle aged men have lower survival rates in comparison to the other titles on the ship. Young passengers and female passengers seem to have a higher survival rate. Next graph below shows the average fare per ticket type whereas the one on the right shows the number of observations for each ticket type:
 
-```{r visual check with available data3, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data3, cache=TRUE, echo=FALSE, fig.height = 3}
 ticket_avFare <- dat.full.train %>% group_by(Ticket) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 t1 <- g + geom_col(data = ticket_avFare,aes(x=Ticket,y=avFare),fill = "deepskyblue3")
 t2 <- g + geom_col(data = ticket_avFare,aes(x=Ticket,y=n),fill = "salmon3")
@@ -173,7 +173,7 @@ grid.arrange(t1,t2, ncol=2)
 
 It can be seen that the average ticket prices are similar except for type 5 and type P, both of which are much more expensive compared to other ticket types. It can also be seen that ticket type 6 is the most sold one compared to the other types which are similar in amount. The next two graphs below show the relationship between these ticket types and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each ticket type is shown on the below right graph:
 
-```{r visual check with available data4, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data4, cache=TRUE, echo=FALSE, fig.height = 3}
 survTicket1 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "stack")
 survTicket2 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "fill")
 grid.arrange(survTicket1,survTicket2, ncol=2)
@@ -181,7 +181,7 @@ grid.arrange(survTicket1,survTicket2, ncol=2)
 
 It is a bit hard to make separate conclusions for each ticket type but an obvious one is that the passengers having expensive ticket types have higher survival rates. Next graph below shows the average fare per passenger class whereas the one on the right shows the number of observations for each passenger class:
 
-```{r visual check with available data5, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data5, cache=TRUE, echo=FALSE, fig.height = 3}
 Pclass_avFare <- dat.full.train %>% group_by(Pclass) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 pc1 <- g + geom_col(data = Pclass_avFare,aes(x=Pclass,y=avFare),fill = "deepskyblue3")
 pc2 <- g + geom_col(data = Pclass_avFare,aes(x=Pclass,y=n),fill = "salmon3")
@@ -189,7 +189,7 @@ grid.arrange(pc1,pc2, ncol=2)
 ```
 
 As expected, class 1 passengers pay the highest price compared to other passenger classes. It can also be observed that Class 3 passengers have the highest number. The interesting observation is that class 2 passengers are less in amount in comparison to class 1 passengers. The next two graphs below show the relationship between these passenger classes and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each passenger class is shown on the below right graph:   
-```{r visual check with available data6, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data6, cache=TRUE, echo=FALSE, fig.height = 3}
 survClass1 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "stack")
 survClass2 <- g + geom_bar(data = dat.full.train, aes(x=Pclass, fill = Survived), position = "fill")
 grid.arrange(survClass1,survClass2, ncol=2)
@@ -197,7 +197,7 @@ grid.arrange(survClass1,survClass2, ncol=2)
 
 The survival rate is proportional to the passenger class with passengers that pay the highest price survive the most proportionally. Next we will check the cabin predictor in the same manner.
 
-```{r visual check with available data7, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data7, cache=TRUE, echo=FALSE, fig.height = 3}
 cabin_avFare <- dat.full.train %>% group_by(Cabin) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 cab1 <- g + geom_col(data = cabin_avFare,aes(x=Cabin,y=avFare),fill = "deepskyblue3")
 cab2 <- g + geom_col(data = cabin_avFare,aes(x=Cabin,y=n),fill = "salmon3")
@@ -206,7 +206,7 @@ grid.arrange(cab1,cab2, ncol=2)
 
 As mentioned before, the number of missing values for the cabin predictor is very high. This means either the cabin predictor will be dropped from analysis, which will result in loss of information, or a logic will be applied for imputation of the missing values. The following graphs show the relationship of the cabin predictor to survival rate:
 
-```{r visual check with available data8, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data8, cache=TRUE, echo=FALSE, fig.height = 3}
 survCabin1 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "stack")
 survCabin2 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "fill")
 grid.arrange(survCabin1,survCabin2, ncol=2)
@@ -214,7 +214,7 @@ grid.arrange(survCabin1,survCabin2, ncol=2)
 
 There is not a particular pattern that can be noticed immediately but again cabins with passengers that have paid higher ticket fees tend to have higher survival rate. Next we will check the family size predictor in similar fashion to other predictors above:
 
-```{r visual check with available data9, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data9, cache=TRUE, echo=FALSE, fig.height = 3}
 fSize_avFare <- dat.full.train %>% group_by(fSize) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 f1 <- g + geom_col(data = fSize_avFare,aes(x=fSize,y=avFare),fill = "deepskyblue3")
 f2 <- g + geom_col(data = fSize_avFare,aes(x=fSize,y=n),fill = "salmon3")
@@ -223,7 +223,7 @@ grid.arrange(f1,f2, ncol=2)
 
 Large families have higher average fare but less in total number. The highest number of individuals are single ones whereas small families also make up a big part of the total number of passengers. The next two graphs show the family size relationship to survival rate:
 
-```{r visual check with available data10, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data10, cache=TRUE, echo=FALSE, fig.height = 3}
 survfSize1 <- g + geom_bar(data = dat.full.train, aes(x=fSize, fill = Survived), position = "stack")
 survfSize2 <- g + geom_bar(data = dat.full.train, aes(x=fSize, fill = Survived), position = "fill")
 grid.arrange(survfSize1,survfSize2, ncol=2)
@@ -231,7 +231,7 @@ grid.arrange(survfSize1,survfSize2, ncol=2)
 
 It can be seen that large families and single passengers don't have high survival rate whereas small families have a higher survival rate. Still, the total number of survived single passengers and small families are very close to each other. The next predictor that is going to be observed is the embarkation port:
 
-```{r visual check with available data11, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data11, cache=TRUE, echo=FALSE, fig.height = 3}
 embarked_avFare <- dat.full.train %>% group_by(Embarked) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 em1 <- g + geom_col(data = embarked_avFare,aes(x=Embarked,y=avFare),fill = "deepskyblue3")
 em2 <- g + geom_col(data = embarked_avFare,aes(x=Embarked,y=n),fill = "salmon3")
@@ -240,7 +240,7 @@ grid.arrange(em1,em2, ncol=2)
 
 The figure on the upper left shows the average fare for passengers that embarked from different ports. The 2 missing values have the highest rate. The passengers that embarked from port S are the highest in number. Next, the relationship to survival rate will be checked:
 
-```{r visual check with available data12, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data12, cache=TRUE, echo=FALSE, fig.height = 3}
 survEmbarked1 <- g + geom_bar(data = dat.full.train, aes(x=Embarked, fill = Survived), position = "stack")
 survEmbarked2 <- g + geom_bar(data = dat.full.train, aes(x=Embarked, fill = Survived), position = "fill")
 grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
@@ -248,7 +248,7 @@ grid.arrange(survEmbarked1,survEmbarked2, ncol=2)
 
 It can again be seen that passengers that have paid the highest rate for their tickets in average embarked from a similar port and have a higher survival rate. We will check the sex variable below in similar fashion although it doesn't totally make sense to check the ticket fee for each sex. We will do it for the sake of keeping the same format but will add more specific plots for the predictors:
 
-```{r visual check with available data13, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data13, cache=TRUE, echo=FALSE, fig.height = 3}
 sex_avFare <- dat.full.train %>% group_by(isMale) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
 sex1 <- g + geom_col(data = sex_avFare,aes(x=isMale,y=avFare),fill = "deepskyblue3")
 sex2 <- g + geom_col(data = sex_avFare,aes(x=isMale,y=n),fill = "salmon3")
@@ -257,7 +257,7 @@ grid.arrange(sex1,sex2, ncol=2)
 
 Interestingly, it looks like female passengers have paid more in average for their tickets. There are more male passengers on board which might show the indication that the male passengers are part of a lower passenger class. We will check the relationship to the survival rate now:
 
-```{r visual check with available data14, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data14, cache=TRUE, echo=FALSE, fig.height = 3}
 survSex1 <- g + geom_bar(data = dat.full.train, aes(x=isMale, fill = Survived), position = "stack")
 survSex2 <- g + geom_bar(data = dat.full.train, aes(x=isMale, fill = Survived), position = "fill")
 grid.arrange(survSex1,survSex2, ncol=2)
@@ -269,17 +269,27 @@ We've checked all the categorical variables in relation to the average fee and s
 
 First we will check the relationship between the cabin and the family size:
 
-```{r visual check with available data15, cache=TRUE, echo=FALSE, fig.height = 3.5}
+```{r visual check with available data15, cache=TRUE, echo=FALSE, fig.height = 3}
 cabFsize1 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = fSize), position = "stack")
 cabFsize2 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = fSize), position = "fill")
 grid.arrange(cabFsize1,cabFsize2, ncol=2)
 ```
 
+The number of missing values are so high that the graph on the left above doesn't give much information. Data imputation is necessary to be able to get something meaningful out of the above plot. We will get back to this plot and more others after the imputation is finalized in the next section. However, before that let's have a look into the continous predictor fare for tickets. Age predictor has a lot of missing observations so we will look at it after the imputation as well.
+
+```{r visual check with available data16, cache=TRUE, echo=FALSE, fig.height = 3, message=FALSE}
+fare1 <- g + geom_histogram(data = dat.full.train, aes(Fare), color = "black", fill = "deepskyblue3")
+fare2 <- g + geom_boxplot(data = dat.full.train, aes(Survived, Fare), color = "black", fill = "salmon3")
+grid.arrange(fare1,fare2, ncol=2)
+```
+
+The fare predictor has a skewed distribution so a log transformation or normalization might be necessary. 
+
 ### 2.1 Data Imputation
 
 We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
 
-```{r visual check with available data16, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r visual check with available data17, cache=TRUE, eval=FALSE, echo=FALSE}
 #Imputing the age variable
 for (i in 1:length(dat.full$Age)){
   if(is.na(dat.full$Age[i])==T){
