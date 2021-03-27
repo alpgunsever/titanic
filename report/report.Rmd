@@ -34,11 +34,11 @@ It will be beneficial to look into the raw data available before getting into an
 
 The following adjustments have been implemented to the training and test data sets together after they are combined into a single dataset:
 
-* Passenger class predictor is transformed into factor type.
-* Titles have been extracted from the name variable and factored into Mr, Mrs, Miss, Master, Noble and Soldier levels.
-* Cabin predictor is transformed into factor type.
-* Embarked predictor is transformed into factor type.
-* Ticket predictor is factored into the number of digits of the number part of the ticket. Factors "2","3" and "7" has few observations so they will be combined into a factor level called "Other".
+* Passenger class predictor is transformed into factor type with classes "1", "2" and "3" set as separate levels.
+* Titles have been extracted from the name variable and factored into "Mr", "Mrs", "Miss", "Master", "Noble" and "Soldier" levels based on the implications of various titles.
+* Cabin predictor is transformed into factor type according to the letter in the cabin name.
+* Embarked predictor is transformed into factor type with the first letters of the ports representing different levels as "C", "Q" and "S".
+* Ticket predictor is factored into the number of digits of the number part of the ticket.
 * Family size predictor is created based on number of siblings and spouses including self. Family type predictor is created based on the family size predictor. If the total number of family members are equal to 1, then family type is assigned to "Singleton". If family size is between 1 and 4, then family type is assigned to "small". If family size is greater than 4, then family type is assigned to "large". Family type is factored into these 3 levels.
 * Sex predictor is changed to isMale and factored as a binary predictor with 1 indicating a male passenger and 0 a female passenger.
 
@@ -101,11 +101,11 @@ for (i in 1:length(dat.full$Ticket)) {
 
 dat.full$Ticket <- sapply(dat.full$Ticket, function(x) ifelse(nchar(x)>1,as.character(nchar(x)),x))
 
-for (i in 1:length(dat.full$Ticket)) {
-   if (dat.full$Ticket[i] == '2' || dat.full$Ticket[i] == '3' || dat.full$Ticket[i] == '7'){
-     dat.full$Ticket[i] <- "Other"
-   }
-}
+#for (i in 1:length(dat.full$Ticket)) {
+#   if (dat.full$Ticket[i] == '2' || dat.full$Ticket[i] == '3' || dat.full$Ticket[i] == '7'){
+#     dat.full$Ticket[i] <- "Other"
+#   }
+#}
 
 dat.full$Ticket <- as.factor(dat.full$Ticket)
 
@@ -136,25 +136,24 @@ The data summary for training and test sets combined can be seen below:
 summary(dat.full)
 ```
 
-Age predictor has 263 missing observations, fare has 1, cabin has 1014 and embarked has 2 out of a total of 1309 observations. It seems still possible to replace the missing observations even in Age predictor but imputing the cabin predictor can bring a lot of noise to the data. So the cabin predictor will be dropped but the rest of the predictors will be imputed. However, before getting to that part, it will be best to look at the data summary below showing the structure of each predictor:
+Age predictor has 263 missing observations, fare has 1, cabin has 1014 and embarked has 2 out of a total of 1309 observations. It seems still possible to replace the missing observations even in Age predictor but imputing the cabin predictor can bring a lot of noise to the data. So the cabin predictor might be dropped but the rest of the predictors will be definitely imputed. However, before getting to that part, it will be best to look at the data summary below showing the structure of each predictor:
 
 ```{r data summary2, cache=TRUE, echo=FALSE}
 str(dat.full)
 ```
 
-Another step to take before getting into data imputation is to look at the available data visually. However, to keep the test set information seperate, the exploratory visual checks will be performed only on training set. As a starting point to that, the first plot on below left shows the average age for each title. The one on the right shows the number of observations for each title:
+Another step to take before getting into data imputation is to look at the available data visually. However, to keep the test set information seperate, the exploratory visual checks will be performed only on training set. As a starting point to that, the first plot on below left shows the average fee paid for the ticket of each title. The one on the right shows the number of observations for each title:
 
 ```{r visual check with available data1, cache=TRUE, echo=FALSE, fig.height = 3}
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 g <- ggplot()
-title_avAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avAge = mean(Age, na.rm = T), 
-                                                                medAge = median(Age,na.rm=T))
-p1 <- g + geom_col(data = title_avAge,aes(x=title,y=avAge),fill = "deepskyblue3")
-p2 <- g + geom_col(data = title_avAge,aes(x=title,y=n),fill = "salmon3")
+title_avFare <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
+p1 <- g + geom_col(data = title_avFare,aes(x=title,y=avFare),fill = "deepskyblue3")
+p2 <- g + geom_col(data = title_avFare,aes(x=title,y=n),fill = "salmon3")
 grid.arrange(p1,p2, ncol=2)
 ```
 
-The average age for the title make sense with Master having the lowest average age and Soldier representing seniors that have been in military at some point. It can also be seen that most of the passengers are middle aged men and there are few of nobles and soldiers. The next two graphs below show the relationship between these titles and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each title is shown on the below right graph:
+The average fee for the title make sense with Noble title having the highest average fee and Mr title  having the lowest most probably because of the contribution of single male passengers that have entered the ship with a cheap ticket. The next two graphs below show the relationship between these titles and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each title is shown on the below right graph:
 
 ```{r visual check with available data2, cache=TRUE, echo=FALSE, fig.height = 3}
 survtitle1 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived), position = "stack") + theme(axis.text.x=element_text(angle = 45, vjust = 1))
@@ -162,7 +161,7 @@ survtitle2 <- g + geom_bar(data = dat.full.train, aes(x=title, fill = Survived),
 grid.arrange(survtitle1,survtitle2, ncol=2)
 ```
 
-It can be seen that middle aged men have lower survival rates in comparison to the other titles on the ship. Young passengers and female passengers seem to have a higher survival rate. Next graph below shows the average fare per ticket type whereas the one on the right shows the number of observations for each ticket type:
+It can be seen that men with cheaper tickets have lower survival rates in comparison to the other titles on the ship. Young passengers, female passengers and nobles seem to have a higher survival rate. Next graph below shows the average fare per ticket type whereas the one on the right shows the number of observations for each ticket type:
 
 ```{r visual check with available data3, cache=TRUE, echo=FALSE, fig.height = 3}
 ticket_avFare <- dat.full.train %>% group_by(Ticket) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
@@ -171,7 +170,7 @@ t2 <- g + geom_col(data = ticket_avFare,aes(x=Ticket,y=n),fill = "salmon3")
 grid.arrange(t1,t2, ncol=2)
 ```
 
-It can be seen that the average ticket prices are similar except for type 5 and type P, both of which are much more expensive compared to other ticket types. It can also be seen that ticket type 6 is the most sold one compared to the other types which are similar in amount. The next two graphs below show the relationship between these ticket types and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each ticket type is shown on the below right graph:
+It can be seen that the average ticket prices are similar between types 3 and 7 and between types 4 and 6. Ticket type 5 is highest compared to other ticket types. On the other hand, types 3 and 7 are owned by lowest number of passengers on the ship whereas type 6 is owned most of the passengers. As mentioned before, the visual exploratory checks are performed only on the training set. However in the summary table above, there was also a ticket type 2 which is coming from the test set. It will be hard to make a prediction about this ticket type if we can't model it on the training set. There are 3 passengers that have ticket type 2, 14 passengers with ticket type 3 and 46 passengers with ticket type 7. Based on the assumption that the average fee paid for these ticket types are similar, it might make sense to combine these three ticket types before modeling. The next two graphs below show the relationship between these ticket types and the survival rate. The one on the left shows the total number of counts represented by coloured bars with green representing the number of survived passengers and red representing the ones that haven't survived the accident. The normalized version showing the proportion of survived and not survived passengers for each ticket type is shown on the below right graph:
 
 ```{r visual check with available data4, cache=TRUE, echo=FALSE, fig.height = 3}
 survTicket1 <- g + geom_bar(data = dat.full.train, aes(x=Ticket, fill = Survived), position = "stack")
@@ -265,7 +264,7 @@ grid.arrange(survSex1,survSex2, ncol=2)
 
 It can be easily noticed that the survival rate is high among female passengers. This predictor is highly correlated to the suvival rate.
 
-We've checked all the categorical variables in relation to the average fee and survival rate. However, it doesn't actually make total sense to check all of the categorical variables in relation to average ticket fee such as cabin. The following graphs will try to add more meaningful visual checks for the data.
+We've checked all the categorical variables in relation to the average fee and survival rate. However, it doesn't actually make total sense to check all of the categorical variables in relation to average ticket fee such as cabin type or titles. The following graphs will try to add more meaningful visual checks for the available data.
 
 First we will check the relationship between the cabin and the family size:
 
