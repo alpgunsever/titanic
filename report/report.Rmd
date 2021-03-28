@@ -301,7 +301,14 @@ We can see a slight implication on the above right figure of younger passengers 
 
 ### 2.1 Data Imputation
 
-We will impute the missing age observations by replacing them with median of each title group that the individual belongs to.
+In the summary table above for a combined dataset of both training and test datasets,  we have observed 263 missing observations for Age predictor, 1 for Fare predictor, 1014 for Cabin predictor and 2 for Embarked predictor. We will try to impute all the missing observations although an evaluation needs to be made for the Cabin predictor if the imputed dataset makes sense. First let's have a look at a graphical representation of the missing observations:
+
+```{r final transformation 1, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
+aggr(dat.full, numbers=TRUE, prop = c(TRUE,FALSE))
+```
+
+
+We will start by by replacing them with median of each title group that the individual belongs to.
 
 ```{r visual check with available data19, cache=TRUE, eval=FALSE, echo=FALSE}
 #Imputing the age variable
@@ -336,9 +343,6 @@ Individuals that are upper class passengers, are members of small families(2 to 
 Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor.
 
 ```{r missing data, cache=TRUE, eval=FALSE, echo=FALSE}
-dat.full <- dat.full[ , !(names(dat.full) %in% c("Cabin"))]
-md.pattern(dat.full, rotate.names = TRUE)
-
 imp_full <- mice(dat.full, m = 20, maxit = 40,printFlag = FALSE)
 summary(imp_full)
 imp_full$method
