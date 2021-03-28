@@ -32,6 +32,21 @@ library(pROC)
 
 It will be beneficial to look into the raw data available before getting into any analysis work. However, to be able to observe the data at hand, the existing observations for different predictors will be formatted into data structures that can be handled by R in a meaningful way.
 
+Before getting into any data cleaning or modification, let's have a look at some of the rows of the raw data:
+
+```{r check raw data, cache=TRUE, echo=FALSE}
+# read train and test data
+dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
+dat.train <- read.csv(file.path(dir,"train.csv"))
+dat.test <- read.csv(file.path(dir,"test.csv"))
+
+# combine train and test data for cleaning
+dat.train_without_survival <- cbind(data.frame(PassengerId=dat.train[,1]),dat.train[,3:length(colnames(dat.train))])
+dat.full <- rbind(dat.train_without_survival, dat.test)
+
+head(dat.full)
+```
+
 The following adjustments have been implemented to the training and test data sets together after they are combined into a single dataset:
 
 * Passenger class predictor is transformed into factor type with classes "1", "2" and "3" set as separate levels.
@@ -43,15 +58,6 @@ The following adjustments have been implemented to the training and test data se
 * Sex predictor is changed to isMale and factored as a binary predictor with 1 indicating a male passenger and 0 a female passenger.
 
 ```{r clean data, cache=TRUE, echo=FALSE}
-# read train and test data
-dir <- file.path("C:","Users","alpgu","Dropbox","Data Science","Bayesian Data Analysis","BDA3 (Gelman)","titanic","data")
-dat.train <- read.csv(file.path(dir,"train.csv"))
-dat.test <- read.csv(file.path(dir,"test.csv"))
-
-# combine train and test data for cleaning
-dat.train_without_survival <- cbind(data.frame(PassengerId=dat.train[,1]),dat.train[,3:length(colnames(dat.train))])
-dat.full <- rbind(dat.train_without_survival, dat.test)
-
 # adjustments on data set
 
 # factorize Pclass variable
