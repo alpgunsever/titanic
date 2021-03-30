@@ -334,6 +334,29 @@ grid.arrange(age21,age22, ncol=2)
 
 It can be observed above that the number of missing observations are mostly around 30 years of age. Nevertheless, the general shape is very similar to the raw data.
 
+Next we will look at the imputation of 2 missing observations from Embarked predictor. As the number of missing observations is very low compared to the total number of observations and as the missing observations have both survived the accident, they will be imputed as part of the factor level, which is "C". 
+
+The other missing observation is from Fare predictor and it will be imputed by replacing the missing observation with the median value of the existing observations. Again, this imputation isn't expected to have a huge effect on the analysis.
+
+```{r imputation 4, cache=TRUE, eval=TRUE, echo=FALSE}
+dat.full$Embarked <- as.character(dat.full$Embarked)
+for (i in 1:length(dat.full$Embarked)){
+  if(is.na(dat.full$Embarked[i])){
+    dat.full$Embarked[i] <- "C"  
+  } 
+}
+dat.full$Embarked <- as.factor(dat.full$Embarked)
+
+
+for (i in 1:length(dat.full$Fare)){
+  if(is.na(dat.full$Fare[i])){
+    dat.full$Fare[i] <- as.numeric(median(dat.full.train_temp$Fare, na.rm = T))  
+  } 
+}
+```
+
+The final predictor to be imputed is Cabin. It has the most amount of missing observations so it will add noise to the analysis. Again mice package will be used for imputation using Embarked, passenger class and family size predictors.
+
 ### 2.2 Data Transformation
 
 ```{r final transformation 3, cache=TRUE, eval=TRUE, echo=FALSE}
@@ -356,12 +379,6 @@ Individuals that are upper class passengers, are members of small families(2 to 
 Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor.
 
 ```{r missing data, cache=TRUE, eval=FALSE, echo=FALSE}
-imp_full <- mice(dat.full, m = 20, maxit = 40,printFlag = FALSE)
-summary(imp_full)
-imp_full$method
-plot(imp_full)
-dat.full_imp <- complete(imp_full)
-
 # Log transform continuous age and fare variable
 dat.full_imp$FareLog <- log(dat.full_imp$Fare+1) # 1 added to avoid log(0)
 dat.full_imp$AgeLog <- log(dat.full_imp$Age+1) # 1 added to avoid log(0)
