@@ -315,29 +315,15 @@ aggr(dat.full, numbers=TRUE, prop = c(TRUE,FALSE))
 
 The plot on the left shows the percentage of the missing data per predictor. It can be seen as mentioned before as well that Age and Cabin predictors have the highest number of missing observations. The plot on the right shows the missing observations as a combination. Each row can be read as a specific combination of observations with columns representing the predictors. For example the first row represents the single observation where both Fare and Cabin predictors are missing at the same time. The second row represents the two observations where missing values are for the Embarked predictor. The same goes for all the combinations of missing observations with the fifth row representing 270 observations without any missing values. The methodology for imputation of each predictor will be explained in the following paragraphs. The imputation process will be carried out for both training and test sets combined.
 
-We will start imputing the missing observations in the Age predictor. We wil replace the missing observations with the median of each title group that the missing observation belongs to. It will add bias to the predictor and will make it approach the median value but having the median per group will also add group level variance to the predictor.
+We will start imputing the missing observations in the Age predictor. We wil replace the missing observations using mice package which is implementing multiple imputation methods for missing observations. The Age predictor will be imputed by using title and family size predictors as they are assessed to be the most suitable ones for predicting the missing Age observations. The method implemented will be weighted predictive mean matching and 20 multiple imputations will be performed.
 
 ```{r imputation 2, cache=TRUE, eval=TRUE, echo=FALSE}
 imp_Age <- mice(data = data.frame(Age=dat.full$Age, title=dat.full$title, fSize = dat.full$fSize), m=20, printFlag = FALSE, method = "midastouch")
-plot(imp_Age)
-dat.full$Age <- complete(imp_Age)
-
-#Imputing the age variable
-#title_medAge <- dat.full.train %>% group_by(title) %>% summarise(n=n(),avFare = median(Age, na.rm = T))
-#for (i in 1:length(dat.full$Age)){
-#  if(is.na(dat.full$Age[i])==T){
-#    if(dat.full$title[i] == "Master") dat.full$Age[i] = title_medAge[1,3]
-#    if(dat.full$title[i] == "Miss") dat.full$Age[i] = title_medAge[2,3]
-#    if(dat.full$title[i] == "Mr") dat.full$Age[i] = title_medAge[3,3]
-#    if(dat.full$title[i] == "Mrs") dat.full$Age[i] = title_medAge[4,3]
-#    if(dat.full$title[i] == "Noble") dat.full$Age[i] = title_medAge[5,3]
-#    if(dat.full$title[i] == "Soldier") dat.full$Age[i] = title_medAge[6,3]
-#  }
-#}
-dat.full$Age <- as.numeric(dat.full$Age)
+imputed_Age <- complete(imp_Age)
+dat.full$Age <- as.numeric(imputed_Age[,1])
 ```
 
-Now we can have a look at the exploratory graphs for this predictor after imputation for all the missing observations is completed. The visualization will represent only the training set values as done before:
+Now we can have a look at the exploratory graphs for the Age predictor after imputation for all the missing observations is completed. The visualization will represent only the training set values as done before:
 
 ```{r imputation 3, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
 dat.full.train_temp <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
@@ -345,6 +331,8 @@ age21 <- g + geom_histogram(data = dat.full.train_temp, aes(Age), color = "black
 age22 <- g + geom_boxplot(data = dat.full.train_temp, aes(Survived, Age), color = "black", fill = "salmon3")
 grid.arrange(age21,age22, ncol=2)
 ```
+
+It can be observed above that the number of missing observations are mostly around 30 years of age. Nevertheless, the general shape is very similar to the raw data.
 
 ### 2.2 Data Transformation
 
