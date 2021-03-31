@@ -315,7 +315,7 @@ aggr(dat.full, numbers=TRUE, prop = c(TRUE,FALSE))
 
 The plot on the left shows the percentage of the missing data per predictor. It can be seen as mentioned before as well that Age and Cabin predictors have the highest number of missing observations. The plot on the right shows the missing observations as a combination. Each row can be read as a specific combination of observations with columns representing the predictors. For example the first row represents the single observation where both Fare and Cabin predictors are missing at the same time. The second row represents the two observations where missing values are for the Embarked predictor. The same goes for all the combinations of missing observations with the fifth row representing 270 observations without any missing values. The methodology for imputation of each predictor will be explained in the following paragraphs. The imputation process will be carried out for both training and test sets combined.
 
-We will start imputing the missing observations in the Age predictor. We wil replace the missing observations using mice package which is implementing multiple imputation methods for missing observations. The Age predictor will be imputed by using title and family size predictors as they are assessed to be the most suitable ones for predicting the missing Age observations. The method implemented will be weighted predictive mean matching and 20 multiple imputations will be performed.
+We will start imputing the missing observations in the Age predictor. We wil replace the missing observations using mice package which is implementing multiple imputation methods for missing observations. The details of the algorithm will not be discussed here but they can be accessed via the package official document.  The Age predictor will be imputed by using title and family size predictors as they are assessed to be the most suitable ones for predicting the missing Age observations. The method implemented will be weighted predictive mean matching and 20 multiple imputations will be performed.
 
 ```{r imputation 2, cache=TRUE, eval=TRUE, echo=FALSE}
 imp_Age <- mice(data = data.frame(Age=dat.full$Age, title=dat.full$title, fSize = dat.full$fSize), m=20, printFlag = FALSE, method = "midastouch")
@@ -323,9 +323,15 @@ imputed_Age <- complete(imp_Age)
 dat.full$Age <- as.numeric(imputed_Age[,1])
 ```
 
-Now we can have a look at the exploratory graphs for the Age predictor after imputation for all the missing observations is completed. The visualization will represent only the training set values as done before:
+The plot below shows the density plot for the Age predictor with blue curve representing the observed data and the red curves representing the imputed data for each imputation:
 
 ```{r imputation 3, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
+densityplot(imp_Age)
+```
+
+It can be seen from the above plot that the imputed data is very close to the existing data. Now we can have a look at the exploratory graphs for the Age predictor after imputation for all the missing observations is completed. The visualization will represent only the training set values as done before:
+
+```{r imputation 4, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
 dat.full.train_temp <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 age21 <- g + geom_histogram(data = dat.full.train_temp, aes(Age), color = "black", fill = "deepskyblue3")
 age22 <- g + geom_boxplot(data = dat.full.train_temp, aes(Survived, Age), color = "black", fill = "salmon3")
@@ -338,7 +344,7 @@ Next we will look at the imputation of 2 missing observations from Embarked pred
 
 The other missing observation is from Fare predictor and it will be imputed by replacing the missing observation with the median value of the existing observations. Again, this imputation isn't expected to have a huge effect on the analysis.
 
-```{r imputation 4, cache=TRUE, eval=TRUE, echo=FALSE}
+```{r imputation 5, cache=TRUE, eval=TRUE, echo=FALSE}
 dat.full$Embarked <- as.character(dat.full$Embarked)
 for (i in 1:length(dat.full$Embarked)){
   if(is.na(dat.full$Embarked[i])){
@@ -355,7 +361,21 @@ for (i in 1:length(dat.full$Fare)){
 }
 ```
 
-The final predictor to be imputed is Cabin. It has the most amount of missing observations so it will add noise to the analysis. Again mice package will be used for imputation using Embarked, passenger class and family size predictors.
+The final predictor to be imputed is Cabin. It has the most amount of missing observations so it is expected to add noise to the analysis. Again mice package will be used for imputation using all the available and previously imputed data with the method of polytomous logistic regression for prediction of missing values.
+
+```{r imputation 6, cache=TRUE, eval=TRUE, echo=FALSE}
+imp_Cabin <- mice(data = dat.full, m=20, printFlag = FALSE)
+imputed_Cabin <- complete(imp_Cabin)
+dat.full$Cabin <- as.factor(imputed_Cabin[,1])
+```
+
+Again the density plot for the observed data and the imputed data can be seen in the below graph:
+
+```{r imputation 7, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
+densityplot(imp_Cabin,  ~ Cabin)
+```
+
+The x-axis numbers actually represent the levels of the Cabin predictor starting from "A". The imputed data shows a different pattern than the available data which can be expected due to high number of missing observations in comparison to the existing ones. It can be seen in the above plot that the imputed values are gathered around level "6" which represents the cabin type "F".
 
 ### 2.2 Data Transformation
 
@@ -371,7 +391,6 @@ dat.full$title <- as.factor(dat.full$title)
 dat.full$title <- droplevels(dat.full$title)
 
 dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
-g + geom_boxplot(data = dat.full.train, aes(Survived, Age))
 ```
 
 Individuals that are upper class passengers, are members of small families(2 to 4 family members), embarked from C and are below 60 years old tend to have higher survival rates. 
