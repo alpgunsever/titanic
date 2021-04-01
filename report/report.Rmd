@@ -317,7 +317,7 @@ The plot on the left shows the percentage of the missing data per predictor. It 
 
 We will start imputing the missing observations in the Age predictor. We wil replace the missing observations using mice package which is implementing multiple imputation methods for missing observations. The details of the algorithm will not be discussed here but they can be accessed via the package official document.  The Age predictor will be imputed by using title and family size predictors as they are assessed to be the most suitable ones for predicting the missing Age observations. The method implemented will be weighted predictive mean matching and 20 multiple imputations will be performed.
 
-```{r imputation 2, cache=TRUE, eval=TRUE, echo=FALSE}
+```{r imputation 2, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
 imp_Age <- mice(data = data.frame(Age=dat.full$Age, title=dat.full$title, fSize = dat.full$fSize), m=20, printFlag = FALSE, method = "midastouch")
 imputed_Age <- complete(imp_Age)
 dat.full$Age <- as.numeric(imputed_Age[,1])
@@ -363,10 +363,10 @@ for (i in 1:length(dat.full$Fare)){
 
 The final predictor to be imputed is Cabin. It has the most amount of missing observations so it is expected to add noise to the analysis. Again mice package will be used for imputation using all the available and previously imputed data with the method of polytomous logistic regression for prediction of missing values.
 
-```{r imputation 6, cache=TRUE, eval=TRUE, echo=FALSE}
+```{r imputation 6, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
 imp_Cabin <- mice(data = dat.full, m=20, printFlag = FALSE)
 imputed_Cabin <- complete(imp_Cabin)
-dat.full$Cabin <- as.factor(imputed_Cabin[,1])
+dat.full <- imputed_Cabin
 ```
 
 Again the density plot for the observed data and the imputed data can be seen in the below graph:
@@ -375,7 +375,33 @@ Again the density plot for the observed data and the imputed data can be seen in
 densityplot(imp_Cabin,  ~ Cabin)
 ```
 
-The x-axis numbers actually represent the levels of the Cabin predictor starting from "A". The imputed data shows a different pattern than the available data which can be expected due to high number of missing observations in comparison to the existing ones. It can be seen in the above plot that the imputed values are gathered around level "6" which represents the cabin type "F".
+The x-axis numbers actually represent the levels of the Cabin predictor starting from "A". The imputed data shows a different pattern than the available data which can be expected due to high number of missing observations in comparison to the existing ones. It can be seen in the above plot that the imputed values are gathered around level "6" which represents the cabin type "F". Now it makes sense to look at the exploratory graphs one more time:
+
+```{r imputation 8,cache=TRUE, echo=FALSE, fig.height=2.5, message=FALSE, warning=FALSE}
+dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
+cabin_avFare <- dat.full.train %>% group_by(Cabin) %>% summarise(n=n(),avFare = mean(Fare, na.rm = T))
+cab21 <- g + geom_col(data = cabin_avFare,aes(x=Cabin,y=avFare),fill = "deepskyblue3")
+cab22 <- g + geom_col(data = cabin_avFare,aes(x=Cabin,y=n),fill = "salmon3")
+grid.arrange(cab21,cab22, ncol=2)
+```
+
+It can be seen from the graph above that cabin types "B" and "C" have the passengers with the highest average fare whereas the number of passengers are highest in cabin types "F" and "G". The following graphs show the relationship of the cabin predictor to survival rate:
+
+```{r imputation 9, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
+survCabin21 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "stack")
+survCabin22 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = Survived), position = "fill")
+grid.arrange(survCabin21,survCabin22, ncol=2)
+```
+
+It can be observed that the correlation between the passengers that reside in cabins with highest ticket fee tend to have higher survival rates. We can also duplicate the plot where the relationship between cabin and family size can be seen after the imputations are completed:
+
+```{r imputation 10, cache=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE, warning=FALSE}
+cabFsize21 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = fSize), position = "stack")
+cabFsize22 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = fSize), position = "fill")
+grid.arrange(cabFsize21,cabFsize22, ncol=2)
+```
+
+Next, we will look into final transformations of predictors before we start the modelling.
 
 ### 2.2 Data Transformation
 
