@@ -30,7 +30,7 @@ library(pROC)
 
 ## 2- Exploratory Data Analysis
 
-It will be beneficial to look into the raw data available before getting into any analysis work. However, to be able to observe the data at hand, the existing observations for different predictors will be formatted into data structures that can be handled by R in a meaningful way.
+It will be beneficial to look into the raw data available before getting into any analysis work. However, it must be stated that any comments on this section will be based on point averages and should be taken as initial observation not causal relationships. In order to do so, the existing observations for different predictors will be first formatted into data structures that can be handled by R in a meaningful way.
 
 Before getting into any data cleaning or modification, let's have a look at some of the rows of the raw data:
 
@@ -401,39 +401,81 @@ cabFsize22 <- g + geom_bar(data = dat.full.train, aes(x=Cabin, fill = fSize), po
 grid.arrange(cabFsize21,cabFsize22, ncol=2)
 ```
 
-Next, we will look into final transformations of predictors before we start the modelling.
+As expected, cabins for larger families tend to have lower survival rate whereas the ones for small families tend to have higher survival rate. Next, we will look into final transformations of predictors before we start the modelling.
 
 ### 2.2 Data Transformation
 
-```{r final transformation 3, cache=TRUE, eval=TRUE, echo=FALSE}
+In this section, we will look into transforming the imputed data to its final shape. We will start with the title predictor. It was observed that "Noble" and "Soldier" titles had few observations compared to other factor levels and therefore could end up in unbalanced groups if hierarchical modeling is going to be applied. The number of observations for each title group can be seen below. The number of individuals are presented for both training and test data sets combined:
+
+```{r final transformation 1, cache=TRUE, eval=TRUE, echo=FALSE}
+summary(dat.full$title)
+```
+
+The "Noble" title group will be combined with the "Master" title group and will be named "Other". The "Soldier" title group will be combined with the "Mr" title group. These decisions are made based on the similarity of the relationship to the survival rate.
+
+```{r final transformation 2, cache=TRUE, eval=TRUE, echo=FALSE}
 # Making title more balanced
 dat.full$title <- as.character(dat.full$title)
 for (i in 1:length(dat.full$title)){
-  if(grepl("Master|Noble|Soldier",dat.full$title[i]) == T){
+  if(grepl("Master|Noble",dat.full$title[i]) == T){
     dat.full$title[i] <- "Other"  
+  } 
+  if(grepl("Soldier",dat.full$title[i]) == T){
+    dat.full$title[i] <- "Mr"  
   } 
 }
 dat.full$title <- as.factor(dat.full$title)
 dat.full$title <- droplevels(dat.full$title)
-
-dat.full.train <- data.frame(Survived = as.factor(dat.train[,2]),dat.full[1:891,])
 ```
 
-Individuals that are upper class passengers, are members of small families(2 to 4 family members), embarked from C and are below 60 years old tend to have higher survival rates. 
+The title factor levels have changed as below after the transformation:
 
-Cabin variable will be dropped as it doesn't seem possible to impute this predictor with lots of missing observations. However, it might still makes sense to impute age predictor.
-
-```{r missing data, cache=TRUE, eval=FALSE, echo=FALSE}
-# Log transform continuous age and fare variable
-dat.full_imp$FareLog <- log(dat.full_imp$Fare+1) # 1 added to avoid log(0)
-dat.full_imp$AgeLog <- log(dat.full_imp$Age+1) # 1 added to avoid log(0)
-dat.full_imp <- dat.full_imp[ , -which(names(dat.full_imp) %in% c("Age","Fare"))]
-
-train_imp <- data.frame(PassengerId = dat.full_imp[1:891,1], Survived = as.factor(dat.train[,2]), dat.full_imp[1:891,2:9])
-test_imp <- dat.full_imp[892:1309,]
+```{r final transformation 3, cache=TRUE, eval=TRUE, echo=FALSE}
+summary(dat.full$title)
 ```
 
-The imputed dataset will be used for analysis.
+Next we we will look into the ticket predictor. As mentioned in the initial part of the exploratory analysis, the test set had a ticket type "2" that the training set didn't have. The number of type "2" tickets are very low like in types "3" and "7" with similar fares. We can have a look at the number of observations for each level for both training and test datasets below:
+
+```{r final transformation 4, cache=TRUE, eval=TRUE, echo=FALSE}
+summary(dat.full$Ticket)
+```
+
+The transformation here would be to combine types "2", "3" and "7" as "Other" ticket type so that the modeling can be performed with the training set and proper predictions can be applied to the test set. The final number of observations for each ticket type can be seen below after the transformation is applied:
+
+```{r final transformation 5, cache=TRUE, eval=TRUE, echo=FALSE}
+dat.full$Ticket <- as.character(dat.full$Ticket)
+for (i in 1:length(dat.full$Ticket)){
+  if(grepl("2|3|7",dat.full$Ticket[i]) == T){
+    dat.full$Ticket[i] <- "Other"  
+  }
+}
+dat.full$Ticket <- as.factor(dat.full$Ticket)
+dat.full$Ticket <- droplevels(dat.full$Ticket)
+
+summary(dat.full$Ticket)
+```
+
+The final transformation will be applied to the Fare predictor. As has been observed, this predictor has a skewed distribution and it will be beneficial to use the transformed version to let it have a more normal bell shape for modeling. The squareroot will be used for transforming the positive skew of Fare predictor. The distribution for the transformed version of this predictor can be seen below. It should be noted that the plot will only be representing the training set values:
+
+```{r final transformation 6, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE}
+# Sqrt transform continuous  fare variable
+dat.full$FareSqrt <- sqrt(dat.full$Fare)
+dat.full <- dat.full[ , -which(names(dat.full) %in% c("Fare"))]
+
+dat.full.train <- dat.full[1:891,]
+
+g + geom_histogram(data = dat.full.train, aes(FareSqrt), color = "black", fill = "deepskyblue3")
+
+train_imp <- data.frame(PassengerId = dat.full[1:891,1], Survived = as.factor(dat.train[,2]), dat.full[1:891,2:10])
+test_imp <- dat.full[892:1309,]
+```
+
+It can be observed that the transformation wasn't enough to get rid of the whole skewness but still managed to change the shape closer to the normal shape. Both the training and the test datasets will be nomalized before the analysis. The final transformed and normalized version of the training dataset will be used for analysis. The summary of the training dataset before normalization can be seen below representing each level of the categorical predictor without separating them into individual predictors:
+
+```{r final transformation 7, cache=TRUE, eval=TRUE, echo=FALSE}
+summary(train_imp)
+```
+
 
 ```{r model input, cache=TRUE, eval=FALSE, echo=FALSE}
 y.train <- as.numeric(train_imp$Survived) # outcome
