@@ -455,9 +455,9 @@ dat.full$Ticket <- droplevels(dat.full$Ticket)
 summary(dat.full$Ticket)
 ```
 
-The final transformation will be applied to the Fare predictor. As has been observed, this predictor has a skewed distribution and it will be beneficial to use the transformed version to let it have a more normal bell shape for modeling. The squareroot will be used for transforming the positive skew of Fare predictor. The distribution for the transformed version of this predictor can be seen below. It should be noted that the plot will only be representing the training set values:
+The final transformation will be applied to the Fare predictor. As has been observed, this predictor has a skewed distribution and it will be beneficial to use the transformed version. The squareroot will be used for transforming the positive skew of Fare predictor. The distribution for the transformed version of this predictor for only training set can be seen below:
 
-```{r final transformation 6, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE}
+```{r final transformation 6, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, fig.height = 2.5}
 # Sqrt transform continuous  fare variable
 dat.full$FareSqrt <- sqrt(dat.full$Fare)
 dat.full <- dat.full[ , -which(names(dat.full) %in% c("Fare"))]
@@ -470,14 +470,15 @@ train_imp <- data.frame(PassengerId = dat.full[1:891,1], Survived = as.factor(da
 test_imp <- dat.full[892:1309,]
 ```
 
-It can be observed that the transformation wasn't enough to get rid of the whole skewness but still managed to change the shape closer to the normal shape. Both the training and the test datasets will be nomalized before the analysis. The final transformed and normalized version of the training dataset will be used for analysis. The summary of the training dataset before normalization can be seen below representing each level of the categorical predictor without separating them into individual predictors:
+It can be observed that the transformation wasn't enough to get rid of the whole skewness. The summary of the training dataset can be seen below:
 
 ```{r final transformation 7, cache=TRUE, eval=TRUE, echo=FALSE}
 summary(train_imp)
 ```
 
+Both the training and the test datasets have been nomalized to be used for analysis and prediction. The summary of the normalized version of the training set can be seen below:
 
-```{r model input, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r model input, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE}
 y.train <- as.numeric(train_imp$Survived) # outcome
 y.train <- y.train-1
 pId.train <- train_imp$PassengerId # ID for predictions
@@ -486,9 +487,11 @@ pId.test <- test_imp$PassengerId # ID for predictions
 predictor.variables <- colnames(train_imp)[3:length(colnames(train_imp))]
 predictor1.variables <- predictor.variables[predictor.variables != "title"]
 predictor2.variables <- predictor.variables[predictor.variables != "Pclass"]
-predictor3.variables <- predictor.variables[!predictor.variables %in% c("Ticket","Embarked")]
-predictor4.variables <- predictor.variables[!predictor.variables %in% c("Pclass","isMale")]
-predictor5.variables <- predictor.variables[!predictor.variables %in% c("Pclass","title")]
+predictor3.variables <- predictor.variables[predictor.variables != "Cabin"]
+predictor4.variables <- predictor.variables[!predictor.variables %in% c("Ticket","Embarked")]
+predictor5.variables <- predictor.variables[!predictor.variables %in% c("Pclass","isMale")]
+predictor6.variables <- predictor.variables[!predictor.variables %in% c("Pclass","title")]
+predictor7.variables <- predictor.variables[!predictor.variables %in% c("Pclass","Cabin")]
 
 formula_train <- as.formula(y.train~ .)
 formula_test <- as.formula(~ .)
@@ -523,6 +526,16 @@ X5.train <- model.matrix(formula_train, data = X)[,-1]
 X <- subset(test_imp, select=predictor5.variables)
 X5.test <- model.matrix(formula_test, data = X)[,-1]
 
+X <- subset(train_imp, select=predictor6.variables)
+X6.train <- model.matrix(formula_train, data = X)[,-1]
+X <- subset(test_imp, select=predictor6.variables)
+X6.test <- model.matrix(formula_test, data = X)[,-1]
+
+X <- subset(train_imp, select=predictor7.variables)
+X7.train <- model.matrix(formula_train, data = X)[,-1]
+X <- subset(test_imp, select=predictor7.variables)
+X7.test <- model.matrix(formula_test, data = X)[,-1]
+
 colnames(X0.train) <- gsub(" ", "", colnames(X0.train), fixed = TRUE)
 colnames(X0.test) <- gsub(" ", "", colnames(X0.test), fixed = TRUE)
 colnames(X1.train) <- gsub(" ", "", colnames(X1.train), fixed = TRUE)
@@ -535,6 +548,10 @@ colnames(X4.train) <- gsub(" ", "", colnames(X4.train), fixed = TRUE)
 colnames(X4.test) <- gsub(" ", "", colnames(X4.test), fixed = TRUE)
 colnames(X5.train) <- gsub(" ", "", colnames(X5.train), fixed = TRUE)
 colnames(X5.test) <- gsub(" ", "", colnames(X5.test), fixed = TRUE)
+colnames(X6.train) <- gsub(" ", "", colnames(X6.train), fixed = TRUE)
+colnames(X6.test) <- gsub(" ", "", colnames(X6.test), fixed = TRUE)
+colnames(X7.train) <- gsub(" ", "", colnames(X7.train), fixed = TRUE)
+colnames(X7.test) <- gsub(" ", "", colnames(X7.test), fixed = TRUE)
 
 X0.train <- scale(X0.train)
 X0.test <- scale(X0.test)
@@ -548,6 +565,10 @@ X4.train <- scale(X4.train)
 X4.test <- scale(X4.test)
 X5.train <- scale(X5.train)
 X5.test <- scale(X5.test)
+X6.train <- scale(X6.train)
+X6.test <- scale(X6.test)
+X7.train <- scale(X7.train)
+X7.test <- scale(X7.test)
 
 titleTrain <- as.numeric(train_imp$title)
 titleTest <- as.numeric(test_imp$title)
@@ -563,13 +584,22 @@ embarkedTest <- as.numeric(test_imp$Embarked)
 
 isMaleTrain <- as.numeric(train_imp$isMale)
 isMaleTest <- as.numeric(test_imp$isMale)
+
+cabinTrain <- as.numeric(train_imp$Cabin)
+cabinTest <- as.numeric(test_imp$Cabin)
+
+summary(X0.train)
 ```
+
+Now, both the training and test datasets are ready for prior predictive checking.
 
 ## 3- Prior Predictive Checking
 
-We will perform a prior predictive check with only using the priors and no data.The reason for making prior predictive analysis is to make a sanity check on the priors without using the likelihood. 
+In this section, we will perform a prior predictive check by only using the priors and no data.The reason for making prior predictive analysis is to make a sanity check on the priors without using the likelihood. 
 
-```{r prior predictive checking, cache=TRUE, eval=FALSE, echo=FALSE}
+In our analysis, we will look into different models where we will need to move some of the predictors as a grouping variable and the rest for estimating the coefficients. Such an example can be a hierarchical model where we might need to use the title predictor for grouping the rest of the variables according to their title. In any case, we will use weakly informative robust prior of student_t(7,0,2.5) for both population-level and group-level parameter means with an lkj(2) distribution for the correlation matrix of the group level effects while estimating the mean via a multivariate normal distribution. Below we will demonstrate the prior predictive distribution for the non-hierarchical model including all the predictors:
+
+```{r prior predictive checking, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
 # Prior predictive checks
 df0.train <- as.data.frame(cbind(y.train, X0.train))
 
@@ -579,14 +609,19 @@ df1.train <- as.data.frame(cbind(y.train, X1.train,title))
 pClass <- pClassTrain
 df2.train <- as.data.frame(cbind(y.train, X2.train,pClass))
 
+Cabin <- cabinTrain
+df3.train <- as.data.frame(cbind(y.train, X3.train, Cabin))
+
 ticket <- ticketTrain
 embarked <- embarkedTrain
-df3.train <- as.data.frame(cbind(y.train, X3.train,ticket,embarked))
+df4.train <- as.data.frame(cbind(y.train, X4.train,ticket,embarked))
 
 isMale <- isMaleTrain
-df4.train <- as.data.frame(cbind(y.train,X4.train,pClass,isMale))
+df5.train <- as.data.frame(cbind(y.train,X5.train,pClass,isMale))
 
-df5.train <- as.data.frame(cbind(y.train,X5.train,pClass,title))
+df6.train <- as.data.frame(cbind(y.train,X6.train,pClass,title))
+
+df7.train <- as.data.frame(cbind(y.train,X7.train,pClass,Cabin))
 
 formula_only_intercept_population <- as.formula(y.train ~ 1)
 formula_only_intercept_population <- bf(formula = formula_only_intercept_population, center = F)
@@ -603,26 +638,25 @@ formula_hier1_title <- bf(formula = formula_hier1_title, center = F)
 formula_hier2_pClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df2.train)[2:(length(colnames(df2.train))-1)], collapse = "+")),"+(1+",paste(colnames(df2.train)[2:(length(colnames(df2.train))-1)], collapse = "+"),"|pClass)"))
 formula_hier2_pClass <- bf(formula = formula_hier2_pClass, center = F)
 
-prior0 <- prior(student_t(3,0,2.5), class = b)
-prior1 <- prior(student_t(3,0,2.5), class = b) + prior(lkj(2), class = cor)
+prior0 <- prior(student_t(7,0,2.5), class = b)
+prior1 <- prior(student_t(7,0,2.5), class = b) + prior(lkj(2), class = cor)
 prior2 <- prior(horseshoe(1), class = b)
 
-multi_hier1_title_prior.fit <- brm(formula = formula_hier1_title,
-                                       data = df1.train,
-                                       prior = prior1,
+all_predictors.fit <- brm(formula = formula_all_population,
+                                       data = df0.train,
+                                       prior = prior0,
                                        sample_prior = "only",
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15))
 
-yrep.prior1 <- posterior_predict(multi_hier1_title_prior.fit)
+yrep.prior0 <- posterior_predict(all_predictors.fit)
 
 # Graphical checks
-pp_check(y.train, yrep.prior1[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep.prior1, fun = "stat_grouped", group = train_imp$title, stat = "mean")
+pp_check(y.train, yrep.prior0, ppc_dens_overlay)
 ```
 
-We have used weakly informative robust prior of student_t(3,0,2.5) for both population-level and group-level parameters. We also used lkj(2) for the correlation matrix. It can be seen that the spread for prior predictive samples have much higher variance than the actual response variable for the training set. It confirms that the chosen prior can be used for posterior predictive check along with the likelihood.
+In the above figure, the solid black line is the actual distribution of the training set represented by "y" and the blue lines are the simulations with parameters picked from a robust student-t prior distribution represented by "y-rep" for the population-level effects. A bernoulli model with a logit link function has been used for modelling. By looking at the figure, it can be concluded that the chosen prior is suitable for analysis and prediction using the same model.
 
 ## 4 - Model Fitting and Algorithm Diagnostics
 ```{r model fitting, cache=TRUE, eval=FALSE, echo=FALSE}
