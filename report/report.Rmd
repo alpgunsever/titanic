@@ -597,12 +597,47 @@ Now, both the training and test datasets are ready for prior predictive checking
 
 In this section, we will perform a prior predictive check by only using the priors and no data.The reason for making prior predictive analysis is to make a sanity check on the priors without using the likelihood. 
 
-In our analysis, we will look into different models where we will need to move some of the predictors as a grouping variable and the rest for estimating the coefficients. Such an example can be a hierarchical model where we might need to use the title predictor for grouping the rest of the variables according to their title. In any case, we will use weakly informative robust prior of student_t(7,0,2.5) for both population-level and group-level parameter means with an lkj(2) distribution for the correlation matrix of the group level effects while estimating the mean via a multivariate normal distribution. Below we will demonstrate the prior predictive distribution for the non-hierarchical model including all the predictors:
+In our analysis, we will look into different models where we will need to move some of the predictors as a grouping variable and the rest for estimating the coefficients. Such an example can be a hierarchical model where we might need to use the title predictor for grouping the rest of the variables according to their title group. In any case, we will use weakly informative robust prior of student_t(7,0,2.5) for both population-level means with an lkj(2) distribution for the correlation matrix of the group level effects using a multivariate normal distribution. The estimated parameter coefficients will be used in a generalized linear model to estimate the bernoulli logit input. Below we will demonstrate the prior predictive distribution for the non-hierarchical model including all the predictors. It can also be named as a fully pooled model consisting of only population level effects:
 
 ```{r prior predictive checking, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
 # Prior predictive checks
 df0.train <- as.data.frame(cbind(y.train, X0.train))
 
+prior0 <- prior(student_t(7,0,2.5), class = b)
+
+formula_all_population <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df0.train)[2:length(colnames(df0.train))], collapse = "+"))))
+formula_all_population <- bf(formula = formula_all_population, center = F)
+
+all_predictors.fit <- brm(formula = formula_all_population,
+                                       data = df0.train,
+                                       prior = prior0,
+                                       sample_prior = "only",
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15))
+
+yrep.prior0 <- posterior_predict(all_predictors.fit)
+
+# Graphical checks
+pp_check(y.train, yrep.prior0, ppc_dens_overlay)
+```
+
+In the above figure, the solid black line is the actual distribution of the survival rate in the training set represented by "y" and the blue lines are the simulations of the survival rate using parameters picked from a robust student-t prior distribution represented by "y-rep". A bernoulli model with a logit link function has been used for modelling. By looking at the figure, it can be concluded that the chosen prior is suitable for analysis and prediction using the same model.
+
+## 4 - Model Fitting and Algorithm Diagnostics
+
+We will start model fitting with 8 different models which are decided on a partially random logic. The descriptions of the models are below:
+
+* **Model 1:** Only intercept model with a single population level effect using a student-t(7,0,2.5) prior.
+* **Model 2:** All predictors model with population effects only. It's the same model used for prior predictive checking using a student-t(7,0,2.5) prior.
+* **Model 3:** Again all predictors model with population effects only but this time using a horseshoe prior model with a coefficient of 1 for making it weakly informative.
+* **Model 4:** Only intercept model with both population level and group level effects using a student-t(7,0,2.5) prior. The grouping variable is title.
+* **Model 5:** All predictors model with population and group level effects using a student-t(7,0,2.5) prior and a lkj(2) for the covariance matrix of the parameters variation. The grouping variable is title.
+* **Model 6:** All predictors model with population and group level effects using a student-t(7,0,2.5) prior and a lkj(2) for the covariance matrix of the parameters variation. The grouping variable is pClass.
+* **Model 7:** All predictors model with population and group level effects using a student-t(7,0,2.5) prior and a lkj(2) for the covariance matrix of the parameters variation. The grouping variable is Cabin.
+* **Model 8:** All predictors model with population and group level effects using a student-t(7,0,2.5) prior. The grouping variable is Cabin. The normal model will be used for estimating the parameters of the generalized linear model instead of multivariate linear model.
+
+```{r model fitting, cache=TRUE, eval=TRUE, echo=FALSE}
 title <- titleTrain
 df1.train <- as.data.frame(cbind(y.train, X1.train,title))
 
@@ -629,37 +664,18 @@ formula_only_intercept_population <- bf(formula = formula_only_intercept_populat
 formula_only_intercept_population_and_group <- as.formula(y.train ~ 1 + (1|title))
 formula_only_intercept_population_and_group <- bf(formula = formula_only_intercept_population_and_group, center = F)
 
-formula_all_population <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df0.train)[2:length(colnames(df0.train))], collapse = "+"))))
-formula_all_population <- bf(formula = formula_all_population, center = F)
-
 formula_hier1_title <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+")),"+(1+",paste(colnames(df1.train)[2:(length(colnames(df1.train))-1)], collapse = "+"),"|title)"))
 formula_hier1_title <- bf(formula = formula_hier1_title, center = F)
 
 formula_hier2_pClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df2.train)[2:(length(colnames(df2.train))-1)], collapse = "+")),"+(1+",paste(colnames(df2.train)[2:(length(colnames(df2.train))-1)], collapse = "+"),"|pClass)"))
 formula_hier2_pClass <- bf(formula = formula_hier2_pClass, center = F)
 
-prior0 <- prior(student_t(7,0,2.5), class = b)
+formula_hier3_Cabin <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df3.train)[2:(length(colnames(df3.train))-1)], collapse = "+")),"+(1+",paste(colnames(df3.train)[2:(length(colnames(df3.train))-1)], collapse = "+"),"|Cabin)"))
+formula_hier3_Cabin <- bf(formula = formula_hier3_Cabin, center = F)
+
 prior1 <- prior(student_t(7,0,2.5), class = b) + prior(lkj(2), class = cor)
 prior2 <- prior(horseshoe(1), class = b)
 
-all_predictors.fit <- brm(formula = formula_all_population,
-                                       data = df0.train,
-                                       prior = prior0,
-                                       sample_prior = "only",
-                                       family = bernoulli(link="logit"),
-                                       cores = parallel::detectCores(),
-                                       control = list(adapt_delta = 0.98, max_treedepth = 15))
-
-yrep.prior0 <- posterior_predict(all_predictors.fit)
-
-# Graphical checks
-pp_check(y.train, yrep.prior0, ppc_dens_overlay)
-```
-
-In the above figure, the solid black line is the actual distribution of the training set represented by "y" and the blue lines are the simulations with parameters picked from a robust student-t prior distribution represented by "y-rep" for the population-level effects. A bernoulli model with a logit link function has been used for modelling. By looking at the figure, it can be concluded that the chosen prior is suitable for analysis and prediction using the same model.
-
-## 4 - Model Fitting and Algorithm Diagnostics
-```{r model fitting, cache=TRUE, eval=FALSE, echo=FALSE}
 df0.test <- as.data.frame(cbind(X0.test))
 
 title <- titleTest
@@ -722,6 +738,24 @@ multi_hier1_title_post.fit <- brm(formula = formula_hier1_title,
 multi_hier2_pClass_post.fit <- brm(formula = formula_hier2_pClass,
                                        data = df2.train,
                                        prior = prior1,
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
+# model 7: All predictors model with population and group effects by Cabin----------------------------
+multi_hier3_Cabin_post.fit <- brm(formula = formula_hier3_Cabin,
+                                       data = df3.train,
+                                       prior = prior1,
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
+# model 8: All predictors model with population and group effects by Cabin: no covariance matrix------
+multi_hier4_Cabin_noCov_post.fit <- brm(formula = formula_hier3_Cabin,
+                                       data = df3.train,
+                                       prior = prior0,
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15),
