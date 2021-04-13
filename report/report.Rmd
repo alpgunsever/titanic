@@ -26,6 +26,7 @@ library(dplyr)
 library(gridExtra)
 library(brms)
 library(pROC)
+library(kableExtra)
 ```
 
 ## 2- Exploratory Data Analysis
@@ -752,21 +753,45 @@ multi_hier3_Cabin_post.fit <- brm(formula = formula_hier3_Cabin,
                                        seed = 187)
 ```
 
-After modeling is completed, we can initially look at the bayesian generalization of the R2 coefficient to be able to investigate how much variation in the response variables can be explained by our models below:
+After modeling is completed, we can initially look at the bayesian generalization of the R2 coefficient to be able to investigate how much variation in the response variables can be explained by our models below. 
+
+It seems like the Model 5 is able to explain most of the variation in the response variable which is around 53%. Model 1 doesn't seem to be able to explain any of the variation.
 
 ```{r diagnostics0, cache=TRUE, eval=TRUE, echo=FALSE}
-bayes_R2(only_population_intercept.fit)
-bayes_R2(population_all.fit)
-bayes_R2(population_all_hs.fit)
-bayes_R2(population_and_group_intercept.fit)
-bayes_R2(multi_hier1_title_post.fit)
-bayes_R2(multi_hier2_pClass_post.fit)
-bayes_R2(multi_hier3_Cabin_post.fit)
+bayes_R2_dataframe <- data.frame(Model = as.character(), R2.Estimate = as.numeric(), est.Error = as.numeric())
+
+bayes_R2_dataframe[1,1] <- "Model1"
+bayes_R2_dataframe[1,2] <- round(bayes_R2(only_population_intercept.fit)[1],2)
+bayes_R2_dataframe[1,3] <- round(bayes_R2(only_population_intercept.fit)[2],2)    
+
+bayes_R2_dataframe[2,1] <- "Model2"
+bayes_R2_dataframe[2,2] <- round(bayes_R2(population_all.fit)[1],2)
+bayes_R2_dataframe[2,3] <- round(bayes_R2(population_all.fit)[2],2) 
+
+bayes_R2_dataframe[3,1] <- "Model3"
+bayes_R2_dataframe[3,2] <- round(bayes_R2(population_all_hs.fit)[1],2)
+bayes_R2_dataframe[3,3] <- round(bayes_R2(population_all_hs.fit)[2],2) 
+
+bayes_R2_dataframe[4,1] <- "Model4"
+bayes_R2_dataframe[4,2] <- round(bayes_R2(population_and_group_intercept.fit)[1],2)
+bayes_R2_dataframe[4,3] <- round(bayes_R2(population_and_group_intercept.fit)[2],2) 
+
+bayes_R2_dataframe[5,1] <- "Model5"
+bayes_R2_dataframe[5,2] <- round(bayes_R2(multi_hier1_title_post.fit)[1],2)
+bayes_R2_dataframe[5,3] <- round(bayes_R2(multi_hier1_title_post.fit)[2],2) 
+
+bayes_R2_dataframe[6,1] <- "Model6"
+bayes_R2_dataframe[6,2] <- round(bayes_R2(multi_hier2_pClass_post.fit)[1],2)
+bayes_R2_dataframe[6,3] <- round(bayes_R2(multi_hier2_pClass_post.fit)[2],2)
+
+bayes_R2_dataframe[7,1] <- "Model7"
+bayes_R2_dataframe[7,2] <- round(bayes_R2(multi_hier3_Cabin_post.fit)[1],2)
+bayes_R2_dataframe[7,3] <- round(bayes_R2(multi_hier3_Cabin_post.fit)[2],2)
+
+bayes_R2_dataframe %>% kbl() %>% kable_minimal()
 ```
 
-```{r diagnostics1, cache=TRUE, eval=FALSE, echo=FALSE}
-mcmc_areas(population_all_hs.fit, pars = c("b_Intercept",paste0("b_",colnames(df0.train)[2:(length(colnames(df0.train))-1)])))
-```
+In the next section, we will perform posterior predictive checks and will try to validate our models in more depth.
 
 ## 5 - Posterior Predictive Checking
 
@@ -780,15 +805,40 @@ yrep6.posterior <- posterior_predict(multi_hier2_pClass_post.fit)
 yrep7.posterior <- posterior_predict(multi_hier3_Cabin_post.fit)
 ```
 
-```{r posterior predictive checking, cache=TRUE, eval=FALSE, echo=FALSE}
-pp_check(y.train, yrep1.posterior[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep2.posterior[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep3.posterior[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep4.posterior[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep5.posterior[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep6.posterior[1:50,], ppc_dens_overlay)
-pp_check(y.train, yrep7.posterior[1:50,], ppc_dens_overlay)
+Initially we will plot the posterior predictive distribution simulations below and compare it with the actual reponse variable distribution like we did in the prior predictive check section:
 
+```{r posterior predictive checking 1, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+pp1 <- pp_check(y.train, yrep1.posterior, ppc_dens_overlay) + labs(title = "Model1")
+```
+
+```{r posterior predictive checking 2, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+pp2 <- pp_check(y.train, yrep2.posterior, ppc_dens_overlay) + labs(title = "Model2")
+```
+
+```{r posterior predictive checking 3, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+pp3 <- pp_check(y.train, yrep3.posterior, ppc_dens_overlay) + labs(title = "Model3")
+```
+
+```{r posterior predictive checking 4, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
+pp4 <- pp_check(y.train, yrep4.posterior, ppc_dens_overlay) + labs(title = "Model4")
+grid.arrange(pp1,pp2,pp3,pp4, ncol=2)
+```
+
+```{r posterior predictive checking 5, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+pp5 <- pp_check(y.train, yrep5.posterior, ppc_dens_overlay) + labs(title = "Model5")
+```
+
+```{r posterior predictive checking 6, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+pp6 <- pp_check(y.train, yrep6.posterior, ppc_dens_overlay) + labs(title = "Model6")
+```
+
+```{r posterior predictive checking 7, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
+pp7 <- pp_check(y.train, yrep7.posterior, ppc_dens_overlay) + labs(title = "Model7")
+
+grid.arrange(pp5,pp6,pp7, ncol=2)
+```
+
+```{r posterior predictive checking 8, cache=TRUE, eval=FALSE, echo=FALSE}
 pp_check(y.train, yrep5.posterior, fun = "stat_grouped", group = train_imp$title, stat = "mean")
 pp_check(y.train, yrep6.posterior, fun = "stat_grouped", group = train_imp$pClass, stat = "mean")
 pp_check(y.train, yrep7.posterior, fun = "stat_grouped", group = train_imp$Cabin, stat = "mean")
