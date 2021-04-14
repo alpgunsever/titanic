@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 This is a data analysis report intended to test bayesian data analysis skills using the titanic dataset from Kaggle. A bayesian data analysis framework will be followed to perform a full analysis on the titanic dataset. The analysis will be finalized by coming up with a final model and making a prediction with it in the Kaggle competition. All the results and observations will be shared and explained as much as possible for the whole process.
 
-```{r libraries, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE}
+```{r libraries, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
 library(stringr)
 library(corrplot)
 library(projpred)
@@ -805,44 +805,88 @@ yrep6.posterior <- posterior_predict(multi_hier2_pClass_post.fit)
 yrep7.posterior <- posterior_predict(multi_hier3_Cabin_post.fit)
 ```
 
-Initially we will plot the posterior predictive distribution simulations below and compare it with the actual reponse variable distribution like we did in the prior predictive check section:
+Initially we will plot the first 50 simulations of the posterior predictive distribution below and compare it with the actual reponse variable distribution like we did in the prior predictive check section:
 
 ```{r posterior predictive checking 1, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
-pp1 <- pp_check(y.train, yrep1.posterior, ppc_dens_overlay) + labs(title = "Model1")
+pp1 <- pp_check(y.train, yrep1.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model1")
 ```
 
 ```{r posterior predictive checking 2, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
-pp2 <- pp_check(y.train, yrep2.posterior, ppc_dens_overlay) + labs(title = "Model2")
+pp2 <- pp_check(y.train, yrep2.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model2")
 ```
 
 ```{r posterior predictive checking 3, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
-pp3 <- pp_check(y.train, yrep3.posterior, ppc_dens_overlay) + labs(title = "Model3")
+pp3 <- pp_check(y.train, yrep3.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model3")
 ```
 
 ```{r posterior predictive checking 4, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
-pp4 <- pp_check(y.train, yrep4.posterior, ppc_dens_overlay) + labs(title = "Model4")
+pp4 <- pp_check(y.train, yrep4.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model4")
 grid.arrange(pp1,pp2,pp3,pp4, ncol=2)
 ```
 
 ```{r posterior predictive checking 5, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
-pp5 <- pp_check(y.train, yrep5.posterior, ppc_dens_overlay) + labs(title = "Model5")
+pp5 <- pp_check(y.train, yrep5.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model5")
 ```
 
 ```{r posterior predictive checking 6, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
-pp6 <- pp_check(y.train, yrep6.posterior, ppc_dens_overlay) + labs(title = "Model6")
+pp6 <- pp_check(y.train, yrep6.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model6")
 ```
 
 ```{r posterior predictive checking 7, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
-pp7 <- pp_check(y.train, yrep7.posterior, ppc_dens_overlay) + labs(title = "Model7")
+pp7 <- pp_check(y.train, yrep7.posterior[1:50,], ppc_dens_overlay) + labs(title = "Model7")
 
 grid.arrange(pp5,pp6,pp7, ncol=2)
 ```
 
-```{r posterior predictive checking 8, cache=TRUE, eval=FALSE, echo=FALSE}
-pp_check(y.train, yrep5.posterior, fun = "stat_grouped", group = train_imp$title, stat = "mean")
-pp_check(y.train, yrep6.posterior, fun = "stat_grouped", group = train_imp$pClass, stat = "mean")
-pp_check(y.train, yrep7.posterior, fun = "stat_grouped", group = train_imp$Cabin, stat = "mean")
+It's not possible to distinguish the 50 simulations of each model from each other but it can be seen that the model parameters have converged to reflect a similar shape to the actual response variable modeled with logistic regression. 
 
+We can next look at the mean and standard deviation of the models in comparison to the actual below:
+
+```{r posterior predictive checking 8, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+ppmsd11 <- ppc_stat(y.train, yrep1.posterior, stat = "mean")
+ppmsd12 <-ppc_stat(y.train, yrep1.posterior, stat = "sd")
+grid.arrange(ppmsd11,ppmsd12, ncol=2, top = "Model1")
+```
+
+```{r posterior predictive checking 9, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+ppmsd21 <- ppc_stat(y.train, yrep2.posterior, stat = "mean")
+ppmsd22 <-ppc_stat(y.train, yrep2.posterior, stat = "sd")
+grid.arrange(ppmsd21,ppmsd22, ncol=2, top = "Model2")
+```
+
+```{r posterior predictive checking 10, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+ppmsd31 <- ppc_stat(y.train, yrep3.posterior, stat = "mean")
+ppmsd32 <-ppc_stat(y.train, yrep3.posterior, stat = "sd")
+grid.arrange(ppmsd31,ppmsd32, ncol=2, top = "Model3")
+```
+
+```{r posterior predictive checking 11, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 2.5, message=FALSE}
+ppmsd41 <- ppc_stat(y.train, yrep4.posterior, stat = "mean")
+ppmsd42 <-ppc_stat(y.train, yrep4.posterior, stat = "sd")
+grid.arrange(ppmsd41,ppmsd42, ncol=2, top = "Model4")
+```
+
+For hierarchical models (Model 5,6 & 7), we will plot mean and standard deviations for each group in the model:
+
+```{r posterior predictive checking 12, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
+ppmsd51 <- ppc_stat_grouped(y.train, yrep5.posterior, group = train_imp$title, stat = "mean")
+ppmsd52 <- ppc_stat_grouped(y.train, yrep5.posterior, group = train_imp$title, stat = "sd")
+grid.arrange(ppmsd51,ppmsd52, ncol=1, top = "Model5")
+```
+
+```{r posterior predictive checking 13, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
+ppmsd61 <- ppc_stat_grouped(y.train, yrep6.posterior, group = train_imp$Pclass, stat = "mean")
+ppmsd62 <- ppc_stat_grouped(y.train, yrep6.posterior, group = train_imp$Pclass, stat = "sd")
+grid.arrange(ppmsd61,ppmsd62, ncol=1, top = "Model6")
+```
+
+```{r posterior predictive checking 14, cache=TRUE, eval=TRUE, echo=FALSE, fig.height = 5, message=FALSE}
+ppmsd71 <- ppc_stat_grouped(y.train, yrep7.posterior, group = train_imp$Cabin, stat = "mean")
+ppmsd72 <- ppc_stat_grouped(y.train, yrep7.posterior, group = train_imp$Cabin, stat = "sd")
+grid.arrange(ppmsd71,ppmsd72, ncol=1, top = "Model7")
+```
+
+```{r posterior predictive checking 15, cache=TRUE, eval=FALSE, echo=FALSE}
 # posterior classification accuracy for model5
 pred5 <- colMeans(yrep5.posterior)
 pr5 <- as.integer(pred5 >= 0.5)
@@ -851,6 +895,8 @@ model5_pca <- round(mean(xor(pr5,as.integer(y.train==0))),2)
 # posterior balanced classification accuracy for model5
 model5_bpca <- round((mean(xor(pr5[y.train==0]>0.5,as.integer(y.train[y.train==0])))+mean(xor(pr5[y.train==1]<0.5,as.integer(y.train[y.train==1]))))/2,2)
 ```
+
+The mean and standard deviations of the models seem to have converged to mimic the response variable distribution. So we can switch to the next section where we try to improve the models as well as creating new ones.
 
 ## 6 - Additional Models and Model Improvements
 ```{r additional models, cache=TRUE, eval=FALSE, echo=FALSE}
