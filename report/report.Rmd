@@ -949,13 +949,25 @@ model_classification[7,3] <- model7_bpca
 model_classification %>% kbl() %>% kable_styling(latex_options = "hold_position")
 ```
 
-It can be seen that the predictive performance of the models are way too over-optimistic.  In the next section, we will try to improve the existing models as well as creating new ones to check if we can improve performance.
+It can be seen that the predictive performance of the models are way too over-optimistic. In the next section, we will try to improve the existing models as well as creating new ones to check if we can improve performance.
 
 ## 6 - Additional Models and Model Improvements
-```{r additional models, cache=TRUE, eval=FALSE, echo=FALSE}
+
+We will again start semi randomly and try to improve our models. The summary of the improvements are as below:
+
+* **Model 8:** Interaction terms added to all predictors with population effects only model. This will be an improvement to Model 2.
+* **Model 9:** Interaction terms added to all predictors with hierarchical model grouped by title. This will be an improvement to Model 5.
+* **Model 10:** Interaction terms added to all predictors with hierarchical model grouped by pClass. This will be an improvement to Model 6.
+* **Model 11:** Interaction terms added to all predictors with hierarchical model grouped by Cabin. This will be an improvement to Model 7.
+* **Model 12:** Double grouping all the predictors for hierarchical model with title and embarked.
+* **Model 13:** Double grouping all the predictors for hierarchical model with pClass and isMale.
+* **Model 14:** Double grouping for hierarchical model with only fareSqrt predictor and double-grouped by pClass and title.
+* **Model 15:** Double grouping all the predictors for hierarchical model with pClass and Cabin.
+
+```{r additional models, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE, results="hide"}
 
 # Interaction terms added to all predictors with population terms only model
-formula_all_population_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + Pclass3:AgeLog + FareLog:AgeLog + I(AgeLog^2))
+formula_all_population_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Age + Ticket5 + Ticket6 + TicketOther + CabinB + CabinC + CabinD + CabinE + CabinF + CabinG + CabinT + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareSqrt + fSizesingleton:FareSqrt + Pclass3:Age + FareSqrt:Age + I(Age^2) + CabinT:EmbarkedQ + TicketOther:isMale1)
 
 formula_all_population_interactions <- bf(formula = formula_all_population_interactions, center = F)
 
@@ -969,13 +981,13 @@ population_all_interactions.fit <- brm(formula = formula_all_population_interact
                                       seed = 187)
 
 # Interaction terms added to all predictors with hierarchical model grouped by title
-formula_multi_hier1_title_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + Pclass3:AgeLog + FareLog:AgeLog + I(AgeLog^2) + (1 + Pclass2 + Pclass3 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog | title))
+formula_multi_hier1_title_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Age + Ticket5 + Ticket6 + TicketOther + CabinB + CabinC + CabinD + CabinE + CabinF + CabinG + CabinT + EmbarkedQ + EmbarkedS + fSizesingleton + fSizesmall + isMale1 + FareSqrt + fSizesingleton:FareSqrt + Pclass3:Age + FareSqrt:Age + I(Age^2) + CabinT:EmbarkedQ + TicketOther:isMale1 + (1 + Pclass2 + Pclass3 + Age + Ticket5 + Ticket6 + TicketOther + CabinB + CabinC + CabinD + CabinE + CabinF + CabinG + CabinT + EmbarkedQ + EmbarkedS + fSizesingleton + fSizesmall + isMale1 + FareSqrt | title))
 
 formula_multi_hier1_title_interactions <- bf(formula = formula_multi_hier1_title_interactions, center = F)
 
 multi_hier1_title_post_interactions.fit <- brm(formula = formula_multi_hier1_title_interactions,
                                        data = df1.train,
-                                       prior = prior1,
+                                       prior = prior0,
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15),
@@ -983,13 +995,27 @@ multi_hier1_title_post_interactions.fit <- brm(formula = formula_multi_hier1_tit
                                        seed = 187)
 
 # Interaction terms added to all predictors with hierarchical model grouped by pClass
-formula_multi_hier2_pClass_interactions <- as.formula(y.train ~ 1 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog + fSizesingleton:FareLog + titleOther:AgeLog + FareLog:AgeLog + I(AgeLog^2) + (1 + Ticket5 + Ticket6 + TicketC + TicketOther + TicketP + TicketS + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareLog + AgeLog | pClass))
+formula_multi_hier2_pClass_interactions <- as.formula(y.train ~ 1 + Age + Ticket5 + Ticket6 + TicketOther + CabinB + CabinC + CabinD + CabinE + CabinF + CabinG + CabinT + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareSqrt + fSizesingleton:FareSqrt + titleOther:Age + FareSqrt:Age + I(Age^2) + CabinT:EmbarkedQ + TicketOther:isMale1 + (1 + Age + Ticket5 + Ticket6 + TicketOther + CabinB + CabinC + CabinD + CabinE + CabinF + CabinG + CabinT + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareSqrt | pClass))
 
 formula_multi_hier2_pClass_interactions <- bf(formula = formula_multi_hier2_pClass_interactions, center = F)
 
 multi_hier2_pClass_post_interactions.fit <- brm(formula = formula_multi_hier2_pClass_interactions,
                                        data = df2.train,
-                                       prior = prior1,
+                                       prior = prior0,
+                                       family = bernoulli(link="logit"),
+                                       cores = parallel::detectCores(),
+                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                       save_pars = save_pars(all = TRUE),
+                                       seed = 187)
+
+# Interaction terms added to all predictors with hierarchical model grouped by Cabin
+formula_multi_hier3_Cabin_interactions <- as.formula(y.train ~ 1 + Pclass2 + Pclass3 + Age + Ticket5 + Ticket6 + TicketOther + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareSqrt + fSizesingleton:FareSqrt + titleOther:Age + FareSqrt:Age + I(Age^2) + TicketOther:isMale1 + (1 + Pclass2 + Pclass3 + Age + Ticket5 + Ticket6 + TicketOther + EmbarkedQ + EmbarkedS + titleMr + titleMrs + titleOther + fSizesingleton + fSizesmall + isMale1 + FareSqrt | Cabin))
+
+formula_multi_hier3_Cabin_interactions <- bf(formula = formula_multi_hier3_Cabin_interactions, center = F)
+
+multi_hier3_Cabin_post_interactions.fit <- brm(formula = formula_multi_hier3_Cabin_interactions,
+                                       data = df3.train,
+                                       prior = prior0,
                                        family = bernoulli(link="logit"),
                                        cores = parallel::detectCores(),
                                        control = list(adapt_delta = 0.98, max_treedepth = 15),
@@ -997,12 +1023,12 @@ multi_hier2_pClass_post_interactions.fit <- brm(formula = formula_multi_hier2_pC
                                        seed = 187)
 
 # Double grouping for hierarchical model with title and embarked
-formula_hier3_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df3.train)[2:(length(colnames(df3.train))-2)], collapse = "+")),"+(1+",paste(colnames(df3.train)[2:(length(colnames(df3.train))-2)], collapse = "+"),"|(ticket:embarked))"))
-formula_hier3_doubleClass <- bf(formula = formula_hier3_doubleClass, center = F)
+formula_hier4_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df4.train)[2:(length(colnames(df4.train))-2)], collapse = "+")),"+(1+",paste(colnames(df4.train)[2:(length(colnames(df4.train))-2)], collapse = "+"),"|(ticket:embarked))"))
+formula_hier4_doubleClass <- bf(formula = formula_hier4_doubleClass, center = F)
 
-multi_hier3_doubleClass.fit <- brm(formula = formula_hier3_doubleClass,
-                                      data = df3.train,
-                                      prior = prior1,
+multi_hier4_doubleClass.fit <- brm(formula = formula_hier4_doubleClass,
+                                      data = df4.train,
+                                      prior = prior0,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
@@ -1010,12 +1036,12 @@ multi_hier3_doubleClass.fit <- brm(formula = formula_hier3_doubleClass,
                                       seed = 187)
 
 # Double grouping for hierarchical model with pClass and isMale
-formula_hier4_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df4.train)[2:(length(colnames(df4.train))-2)], collapse = "+")),"+(1+",paste(colnames(df4.train)[2:(length(colnames(df4.train))-2)], collapse = "+"),"|(pClass:isMale))"))
-formula_hier4_doubleClass <- bf(formula = formula_hier4_doubleClass, center = F)
+formula_hier5_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df5.train)[2:(length(colnames(df5.train))-2)], collapse = "+")),"+(1+",paste(colnames(df5.train)[2:(length(colnames(df5.train))-2)], collapse = "+"),"|(pClass:isMale))"))
+formula_hier5_doubleClass <- bf(formula = formula_hier5_doubleClass, center = F)
 
-multi_hier4_doubleClass.fit <- brm(formula = formula_hier4_doubleClass,
-                                      data = df4.train,
-                                      prior = prior1,
+multi_hier5_doubleClass.fit <- brm(formula = formula_hier5_doubleClass,
+                                      data = df5.train,
+                                      prior = prior0,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
@@ -1023,12 +1049,25 @@ multi_hier4_doubleClass.fit <- brm(formula = formula_hier4_doubleClass,
                                       seed = 187)
 
 # Double grouping for hierarchical model with fare variable and grouped by pClass and title
-formula_hier5_doubleClass <- as.formula(y.train ~ 1 + FareLog + (1 + FareLog | pClass:title))
-formula_hier5_doubleClass <- bf(formula = formula_hier5_doubleClass, center = F)
+formula_hier6_doubleClass <- as.formula(y.train ~ 1 + FareSqrt + (1 + FareSqrt | pClass:title))
+formula_hier6_doubleClass <- bf(formula = formula_hier6_doubleClass, center = F)
 
-multi_hier5_doubleClass.fit <- brm(formula = formula_hier5_doubleClass,
-                                      data = df5.train,
-                                      prior = prior1,
+multi_hier6_doubleClass.fit <- brm(formula = formula_hier6_doubleClass,
+                                      data = df6.train,
+                                      prior = prior0,
+                                      family = bernoulli(link="logit"),
+                                      cores = parallel::detectCores(),
+                                      control = list(adapt_delta = 0.98, max_treedepth = 15),
+                                      save_pars = save_pars(all = TRUE),
+                                      seed = 187)
+
+# Double grouping for hierarchical model with pClass and Cabin
+formula_hier7_doubleClass <- as.formula(paste("y.train ~", paste0("1+",paste(colnames(df7.train)[2:(length(colnames(df7.train))-2)], collapse = "+")),"+(1+",paste(colnames(df7.train)[2:(length(colnames(df7.train))-2)], collapse = "+"),"|(pClass:Cabin))"))
+formula_hier7_doubleClass <- bf(formula = formula_hier7_doubleClass, center = F)
+
+multi_hier7_doubleClass.fit <- brm(formula = formula_hier7_doubleClass,
+                                      data = df7.train,
+                                      prior = prior0,
                                       family = bernoulli(link="logit"),
                                       cores = parallel::detectCores(),
                                       control = list(adapt_delta = 0.98, max_treedepth = 15),
@@ -1036,87 +1075,161 @@ multi_hier5_doubleClass.fit <- brm(formula = formula_hier5_doubleClass,
                                       seed = 187)
 ```
 
+We will not go into posterior predictive checks for each model but instead compare the predictive ability of all the models using leave-one-out cross validation.
+
 ## 7 - Model Comparison
-```{r model comparison, cache=TRUE, eval=FALSE, echo=FALSE}
-loo1 <- brms::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo2 <- brms::loo(population_all.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo3 <- brms::loo(population_all_hs.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo4 <- brms::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo5 <- brms::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo6 <- brms::loo(multi_hier2_pClass_post.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo7 <- brms::loo(population_all_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo8 <- brms::loo(multi_hier1_title_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo9 <- brms::loo(multi_hier2_pClass_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo10 <- brms::loo(multi_hier3_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo11 <- brms::loo(multi_hier4_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
-loo12 <- brms::loo(multi_hier5_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = T)
 
-print(loo1)
-print(loo2)
-print(loo3)
-print(loo4)
-print(loo5)
-print(loo6)
-print(loo7)
-print(loo8)
-print(loo9)
-print(loo10)
-print(loo11)
-print(loo12)
+In this section we compare the predictive performance of the models using leave-one-out cross validation method. The comparison can be seen below with the best model being on the top of the list:
 
-plot(loo1, label_points = TRUE)
-plot(loo2, label_points = TRUE)
-plot(loo3, label_points = TRUE)
-plot(loo4, label_points = TRUE)
-plot(loo5, label_points = TRUE)
-plot(loo6, label_points = TRUE)
-plot(loo7, label_points = TRUE)
-plot(loo8, label_points = TRUE)
-plot(loo9, label_points = TRUE)
-plot(loo10, label_points = TRUE)
-plot(loo11, label_points = TRUE)
-plot(loo12, label_points = TRUE)
-
-brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10,loo11,loo12)
-
-# using list of loo objects
-loo_list <- list(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10, loo11,loo12)
-loo_model_weights(loo_list)
+```{r model comparison1, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE, results="hide"}
+loo1 <- brms::loo(only_population_intercept.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo2 <- brms::loo(population_all.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo3 <- brms::loo(population_all_hs.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo4 <- brms::loo(population_and_group_intercept.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo5 <- brms::loo(multi_hier1_title_post.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo6 <- brms::loo(multi_hier2_pClass_post.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo7 <- brms::loo(multi_hier3_Cabin_post.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo8 <- brms::loo(population_all_interactions.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo9 <- brms::loo(multi_hier1_title_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo10 <- brms::loo(multi_hier2_pClass_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo11 <- brms::loo(multi_hier3_Cabin_post_interactions.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo12 <- brms::loo(multi_hier4_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo13 <- brms::loo(multi_hier5_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo14 <- brms::loo(multi_hier6_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = F)
+loo15 <- brms::loo(multi_hier7_doubleClass.fit, save_psis = TRUE, cores = 4, reloo = F)
 ```
 
-## 8 - Prediction Submission
-```{r predictions model1, cache=TRUE, eval=FALSE, echo=FALSE}
+```{r model comparison2, cache=TRUE, eval=FALSE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE, results="hide"}
+#plot(loo1, label_points = TRUE)
+#plot(loo2, label_points = TRUE)
+#plot(loo3, label_points = TRUE)
+#plot(loo4, label_points = TRUE)
+#plot(loo5, label_points = TRUE)
+#plot(loo6, label_points = TRUE)
+#plot(loo7, label_points = TRUE)
+#plot(loo8, label_points = TRUE)
+#plot(loo9, label_points = TRUE)
+#plot(loo10, label_points = TRUE)
+#plot(loo11, label_points = TRUE)
+#plot(loo12, label_points = TRUE)
+#plot(loo13, label_points = TRUE)
+#plot(loo14, label_points = TRUE)
+#plot(loo15, label_points = TRUE)
+```
+
+```{r model comparison3, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE}
+brms::loo_compare(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10,loo11,loo12,loo13,loo14,loo15)
+# using list of loo objects
+#loo_list <- list(loo1,loo2,loo3,loo4,loo5,loo6,loo7,loo8,loo9,loo10, loo11,loo12)
+#loo_model_weights(loo_list)
+```
+
+According to the comparison above according the loo log likelihood values, the double group model according to isMale and pClass predictors seem to be giving the best predictive performance whereas the only population level intercept model seems to be giving the worst performance. We can also make a comment that there is not a big difference between the predictive performance of the first ten models and the rankings can change if re-fitting is included in the loo analysis.
+
+Next we will perform the prediction on the test set.
+
+## 8 - Prediction Submission and Conlcusions
+
+In this section, we will make predictions for the top 5 models according to loo analysis on the test set and record the actual accuracy. We will also make a prediction with an extra model that is the average of these 5 models using bayesian model averaging. We will inlcude the loo scores and the prediction results in the same table below: 
+
+```{r predictions1, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE}
 title <- titleTest
 pClass <- pClassTest
 ticket <- ticketTest
 embarked <- embarkedTest
 isMale <- isMaleTest
+Cabin <- cabinTest
 
-df.preds <- cbind(df0.test,title,pClass,ticket,embarked,isMale)
+df.preds <- cbind(df0.test,title,pClass,ticket,embarked,isMale,Cabin)
 
-probs_all <- brms::pp_average(only_population_intercept.fit,population_all.fit,population_all_hs.fit,
-                          population_and_group_intercept.fit,multi_hier1_title_post.fit,
-                          multi_hier2_pClass_post.fit,population_all_interactions.fit,
-                          multi_hier1_title_post_interactions.fit,multi_hier2_pClass_post_interactions.fit,
-                          multi_hier3_doubleClass.fit,multi_hier4_doubleClass.fit,multi_hier5_doubleClass.fit,
+probs_all <- brms::pp_average(multi_hier4_doubleClass.fit,
+                              multi_hier5_doubleClass.fit,
+                              multi_hier6_doubleClass.fit,
+                              multi_hier1_title_post.fit,
+                              population_all_hs.fit,
                           newdata = df.preds, allow_new_levels = T)
 
 preds_all <- ifelse(probs_all[,1] > 0.5, 1, 0)
 
 model_all.submission <- data.frame("PassengerId" = pId.test, "Survived" = preds_all)
-write.csv(x = model_all.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model_bma.csv"),
-          row.names = FALSE)
-
-# prediction with best predictive performance model according to loo
-ticket <- ticketTest
-embarked <- embarkedTest
-df3.test <- as.data.frame(cbind(X3.test,ticket,embarked))
-
-y_pred10<- posterior_predict(multi_hier3_doubleClass.fit, df3.test, allow_new_levels = T)
-prob10 <- colMeans(y_pred10)
-pred10 <- as.integer(prob10 >= 0.5)
-
-model_doubleClass.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred10)
-write.csv(x = model_doubleClass.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model_doubleClass.csv"),
+write.csv(x = model_all.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                            "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model_bma.csv"),
           row.names = FALSE)
 ```
+
+
+```{r predictions2, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE}
+# prediction with model13
+y_pred13<- posterior_predict(multi_hier5_doubleClass.fit, df.preds, allow_new_levels = T)
+prob13 <- colMeans(y_pred13)
+pred13 <- as.integer(prob13 >= 0.5)
+
+model13.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred13)
+write.csv(x = model13.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model13.csv"),
+          row.names = FALSE)
+
+# prediction with model3
+y_pred3<- posterior_predict(population_all_hs.fit, df.preds, allow_new_levels = T)
+prob3 <- colMeans(y_pred3)
+pred3 <- as.integer(prob3 >= 0.5)
+
+model3.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred3)
+write.csv(x = model3.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model3.csv"),
+          row.names = FALSE)
+
+# prediction with model14
+y_pred14<- posterior_predict(multi_hier6_doubleClass.fit, df.preds, allow_new_levels = T)
+prob14 <- colMeans(y_pred14)
+pred14 <- as.integer(prob14 >= 0.5)
+
+model14.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred14)
+write.csv(x = model14.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model14.csv"),
+          row.names = FALSE)
+
+# prediction with model12
+y_pred12<- posterior_predict(multi_hier4_doubleClass.fit, df.preds, allow_new_levels = T)
+prob12 <- colMeans(y_pred12)
+pred12 <- as.integer(prob12 >= 0.5)
+
+model12.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred12)
+write.csv(x = model12.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model12.csv"),
+          row.names = FALSE)
+
+# prediction with model5
+y_pred5<- posterior_predict(multi_hier1_title_post.fit, df.preds, allow_new_levels = T)
+prob5 <- colMeans(y_pred5)
+pred5 <- as.integer(prob5 >= 0.5)
+
+model5.submission <- data.frame("PassengerId" = pId.test, "Survived" = pred5)
+write.csv(x = model5.submission, file = file.path("C:","Users","alpgu","Dropbox","Data Science",                                             "Bayesian Data Analysis","BDA3 (Gelman)","titanic","submissions","model5.csv"),
+          row.names = FALSE)
+```
+
+```{r predictions3, cache=TRUE, eval=TRUE, echo=FALSE, message=FALSE, warning = FALSE, error=FALSE}
+model_acc <- data.frame(ModelName = as.character(), Loo = as.numeric(), ActualAcc = as.numeric())
+model_acc[1,1] <- "Model BMA"
+model_acc[1,2] <- NaN
+model_acc[1,3] <- 0.77272
+model_acc[2,1] <- "Model13"
+model_acc[2,2] <- 0
+model_acc[2,3] <- 0.77511
+model_acc[3,1] <- "Model3"
+model_acc[3,2] <- -3.2
+model_acc[3,3] <- 0.77990
+model_acc[4,1] <- "Model14"
+model_acc[4,2] <- -3.3
+model_acc[4,3] <- 0.76794
+model_acc[5,1] <- "Model12"
+model_acc[5,2] <- -3.4
+model_acc[5,3] <- 0.78229
+model_acc[6,1] <- "Model5"
+model_acc[6,2] <- -3.6
+model_acc[6,3] <- 0.77272
+
+model_acc %>% kbl() %>% kable_styling(latex_options = "hold_position")
+```
+
+As can be seen from the results, the predictive performance assessed with loo didn't perfectly reflect the actual predictive performance of the models. The reason could be that the log-likelihood of the models on the training set are very close to each other and that the remodelling of the levarage points with high pareto-k values have not been remodelled. It could have fine tuned the log-likelihood comparison and could have changed the predictive performance ranking.
+
+From the current analysis, it can be seen that the hierarchical model grouped by title gave the best results. Nevertheless, even the best model was able to predict around 78% of the survived passengers. Further non-linear models can be developed to improve performance.
+
+It should be noted that one of the best models is the non-hierarchical one with horseshoe prior. Considering the amount of computing power and time needed to perform the whole analysis, the horseshoe prior provides a very good alternative to the rest of the models.
